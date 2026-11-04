@@ -1,0 +1,20 @@
+/* Tema institucional (Ministerio de Agricultura · Gobierno de Chile · CONAF) aplicado a la
+   Aplicación web de plan de manejo. Usa la misma paleta que SIGPM (../../css/tema-institucional.css). */
+@import url("../../css/tema-institucional.css");
+:root{ --green: var(--inst-verde); --green-d: var(--inst-verde-osc); --green-l: var(--inst-verde-claro); --font: var(--inst-fuente); --blue: var(--inst-azul); --blue-l: var(--inst-azul-claro); --red: var(--inst-rojo); }
+.topbar{ background:#fff; color:#1d2420; height:72px; border-bottom:6px solid; border-image:linear-gradient(to right, var(--inst-azul) 0 33.34%, var(--inst-rojo) 33.34% 66.67%, var(--inst-verde) 66.67% 100%) 1; box-shadow:0 1px 4px rgba(0,0,0,.08) }
+.layout{ padding-top:72px }
+.brand > svg{ display:none }
+.brand,.brand span{ color:#555 }
+.brand b{ color:var(--inst-verde); font-weight:700 }
+.brand > div{ border-left:1px solid #dcdcd3; padding-left:12px }
+.brand .brand-logos{ display:flex; border:0; padding:0 }
+.brand .logo-inst{ height:46px }
+.brand .logo-fallback{ display:none }
+.brand .sin-logo .logo-fallback{ display:flex }
+.proj span{ color:#1d2420 } .proj small{ color:#6c746e }
+.topbar .btn{ background:#fff; color:var(--inst-azul); border-color:var(--inst-azul) }
+.topbar .btn.primary{ background:var(--inst-azul); color:#fff; border-color:var(--inst-azul) }
+.icon-btn.menu{ color:#1d2420 }
+body.en-sigpm .topbar{ top:40px }
+body.en-sigpm .layout{ padding-top:112px }

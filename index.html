@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIGPM · Planes de Manejo de Bosque Nativo</title>
+<meta name="description" content="Sistema de recepción, evaluación y resolución de planes de manejo de bosque nativo con base geoespacial (Ley 20.283).">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="css/estilos.css">
+<link rel="stylesheet" href="css/tema-institucional.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
+<script src="https://unpkg.com/shpjs@4.0.4/dist/shp.min.js"></script>
+</head>
+<body>
+<div class="top-wrap">
+<header class="top">
+  <a class="brand" href="#bandeja" aria-label="SIGPM, inicio"><span id="brand-logos" class="brand-logos"></span><span class="brand-app"><b>SIGPM</b><small>Planes de manejo · bosque nativo</small></span></a>
+  <nav class="nav" aria-label="Principal">
+    <a href="#bandeja" data-v="bandeja">Mi bandeja <span class="nbadge" id="nav-badge" hidden>0</span></a>
+    <a href="#mapa" data-v="mapa">Mapa y fichas prediales</a>
+    <a href="#nueva" data-v="nueva" class="only-st">Nueva solicitud</a>
+    <a href="#registro" data-v="registro">Registro público</a>
+    <a href="#normativa" data-v="normativa">Normativa</a>
+  </nav>
+  <div class="user">
+    <span class="demo-badge" title="Predios, personas, RUT, resoluciones y capas de referencia son ficticios">Maqueta · datos ficticios</span>
+    <div class="user-chip"><b id="user-nom"></b><span id="user-rol"></span></div>
+    <button class="btn sm ghost light" id="btn-logout">Cerrar sesión</button>
+    <button class="icon-btn light" id="btn-export" title="Descargar respaldo de los datos (JSON)" aria-label="Descargar respaldo">⤓</button>
+    <button class="icon-btn light" id="btn-reset" title="Restablecer datos de demostración" aria-label="Restablecer datos">↺</button>
+  </div>
+</header><div class="franja-inst" aria-hidden="true"><span></span><span></span><span></span></div></div>
+<main id="main" class="main"><div class="empty">Cargando…</div></main>
+<section id="login" class="login" hidden aria-labelledby="login-t"></section>
+<div id="toasts" aria-live="polite"></div>
+
+<script src="js/normativa.js"></script>
+<script src="js/util.js"></script>
+<script src="js/geo.js"></script>
+<script src="js/store.js"></script>
+<script src="js/pmfbn.js"></script>
+<script src="js/seed.js"></script>
+<script src="js/evaluacion.js"></script>
+<script src="js/vistas.js"></script>
+<script src="js/expediente.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+Imágenes institucionales
+------------------------
+  logo-conaf-gobierno.svg       Logo institucional (Ministerio de Agricultura · Gobierno de Chile · CONAF),
+                                tomado del proyecto Tabla-de-Rodal-V2 (recortado a su contenido).
+  logo-conaf-gobierno-gris.png  Versión monocroma para el pie de página.
+  portada1.jpg … portada4.jpg   Fotografías del carrusel de la pantalla de ingreso (reducidas a 1600 px).
+
+Se usan en la pantalla de ingreso, en la cabecera de SIGPM y en la barra superior de la
+Aplicación web de plan de manejo (formulario-pmfbn/). Para cambiarlos, reemplace los archivos
+manteniendo los nombres. Si falta el logo, se muestra el nombre de la institución en texto.

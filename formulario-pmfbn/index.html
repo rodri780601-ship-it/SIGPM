@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PMFBN · Plan de Manejo Forestal de Bosque Nativo</title>
+  <meta name="description" content="Formulario digital del Plan de Manejo Forestal de Bosque Nativo (Ley N° 20.283) con cálculos de inventario, gráficos y cartografía digital georreferenciada.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2 6 16h5l-6 9h9v5h4v-5h9l-6-9h5z' fill='%232f6b3f'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/tema-institucional.css">
+</head>
+<body>
+  <header class="topbar">
+    <button id="menu-btn" class="icon-btn menu" aria-label="Menú">☰</button>
+    <div class="brand">
+      <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><path d="M16 2 6 16h5l-6 9h9v5h4v-5h9l-6-9h5z" fill="currentColor"/></svg>
+      <div><b>PMFBN</b><span>Plan de Manejo Forestal de Bosque Nativo · Ley 20.283</span></div>
+    </div>
+    <div class="proj"><span id="proj-name">Proyecto</span><small id="saved"></small></div>
+    <div class="top-actions">
+      <button id="btn-rev" class="btn sm">Revisión</button>
+      <button id="btn-export" class="btn sm primary">Exportar proyecto</button>
+    </div>
+  </header>
+  <div class="layout">
+    <nav id="nav" class="nav" aria-label="Capítulos"></nav>
+    <main id="main" class="main"></main>
+  </div>
+  <div id="print-area"></div>
+
+  <script src="js/tema-institucional.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/catalogos.js"></script>
+  <script src="js/schema.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/geo.js"></script>
+  <script src="js/inventario.js"></script>
+  <script src="js/mapa.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/sigpm-puente.js"></script>
+</body>
+</html>

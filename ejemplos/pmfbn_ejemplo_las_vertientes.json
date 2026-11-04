@@ -1,0 +1,99 @@
+{
+ "version": "1.0",
+ "fuente": "Aplicación web de plan de manejo",
+ "interesado": {
+  "nombre": "SOCIEDAD AGRÍCOLA LAS VERTIENTES LTDA.",
+  "rut": "76.432.109-K"
+ },
+ "predio": {
+  "nombre": "FUNDO LAS VERTIENTES",
+  "rol": "402-55",
+  "comuna": "Paillaco",
+  "superficieTotal": 132,
+  "precipitacion": 1900
+ },
+ "objetivo": {
+  "general": "produccion_maderera",
+  "descripcion": "Raleo comercial de renovales de roble-raulí-coigüe para mejorar crecimiento y calidad."
+ },
+ "rodales": [
+  {
+   "numero": 1,
+   "tipoForestal": "RRC",
+   "estructura": "Renoval",
+   "superficie": 38.5,
+   "pendiente": 18,
+   "densidad": 1450,
+   "areaBasal": 42,
+   "volumen": 290,
+   "especies": "Nothofagus obliqua, N. alpina",
+   "metodo": "corta_intermedia",
+   "extraccionAB": 32,
+   "coberturaRemanente": 65,
+   "anioCorta": 2027,
+   "reforestacion": {
+    "tipo": "no_aplica",
+    "superficie": 0
+   }
+  },
+  {
+   "numero": 2,
+   "tipoForestal": "RRC",
+   "estructura": "Renoval",
+   "superficie": 31.2,
+   "pendiente": 24,
+   "densidad": 1300,
+   "areaBasal": 39,
+   "volumen": 260,
+   "especies": "Nothofagus obliqua, N. dombeyi",
+   "metodo": "corta_intermedia",
+   "extraccionAB": 30,
+   "coberturaRemanente": 62,
+   "anioCorta": 2027,
+   "reforestacion": {
+    "tipo": "no_aplica",
+    "superficie": 0
+   }
+  },
+  {
+   "numero": 3,
+   "tipoForestal": "SV",
+   "estructura": "Adulto-renoval",
+   "superficie": 52.0,
+   "pendiente": 48,
+   "densidad": 980,
+   "areaBasal": 51,
+   "volumen": 340,
+   "especies": "Eucryphia cordifolia, Drimys winteri",
+   "metodo": "corta_seleccion",
+   "extraccionAB": 30,
+   "coberturaRemanente": 62,
+   "anioCorta": 2028,
+   "reforestacion": {
+    "tipo": "regeneracion_natural",
+    "superficie": 52.0,
+    "especie": "Eucryphia cordifolia",
+    "densidad": 3000,
+    "anio": 2029
+   }
+  }
+ ],
+ "prescripciones": {
+  "criterioCorta": "Se extraen individuos dominados, bifurcados y con daño sanitario, manteniendo los árboles de futuro a 6–8 m de distancia.",
+  "madereo": "huinche",
+  "caminosKm": 0.6,
+  "pendienteMaxCaminos": 12
+ },
+ "proteccion": {
+  "zonasDemarcadas": true,
+  "residuos3cm": true,
+  "prevencionIncendios": true,
+  "plagas": true,
+  "sinCaminosZonas": true,
+  "justificacionArt16": "El rodal 3 (pendiente 48 %) se interviene por corta de selección de baja intensidad con huinche, manteniendo 60 % de cobertura."
+ },
+ "firmas": {
+  "interesado": true,
+  "profesional": true
+ }
+}
