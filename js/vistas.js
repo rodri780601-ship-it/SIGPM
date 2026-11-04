@@ -71,8 +71,8 @@ function vistaBandejaST(main, { pend, activas, porVencer, titulo }) {
   const vigentes = DB.solicitudes.filter(s => s.resolucion);
   const porPlazo = l => l.slice().sort((a, b) => ((plazo(a) || {}).quedan ?? 999) - ((plazo(b) || {}).quedan ?? 999));
   const K = {
-    pend: { l: 'Solicitudes pendientes de ingreso', list: pend, vacio: 'No hay solicitudes pendientes de ingreso.' },
-    tramite: { l: 'Solicitudes en trámite', list: porPlazo(activas), vacio: 'No hay solicitudes en trámite.' },
+    pend: { l: 'Solicitudes pendientes de ingreso', list: porPlazo(DB.solicitudes.filter(s => ['recepcion', 'subsanacion'].includes(s.estado))), vacio: 'No hay solicitudes pendientes de ingreso.' },
+    tramite: { l: 'Solicitudes en trámite', list: porPlazo(DB.solicitudes.filter(s => ['asignacion', 'evaluacion', 'revision', 'firma'].includes(s.estado))), vacio: 'No hay solicitudes en trámite.' },
     vigentes: { l: 'Solicitudes con resolución', list: vigentes, vacio: 'No hay solicitudes con resolución.' },
     vencen: { l: 'Solicitudes por vencer (≤ 15 días hábiles)', list: porPlazo(porVencer), vacio: 'Sin urgencias.', cls: porVencer.length ? 'warn' : '', sub: porVencer.length ? 'Revisar prioridad' : 'Sin urgencias' },
   };
