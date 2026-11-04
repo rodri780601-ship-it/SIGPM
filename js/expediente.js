@@ -21,6 +21,31 @@ function vistaNueva(main, predioId) {
   location.replace(`#exp/${sol.id}/ingreso`);
 }
 
+/* Crea una solicitud en recepción a partir de un archivo JSON del plan (secretaría técnica) */
+async function subirSolicitudJSON(file) {
+  if (USUARIO.rol !== 'ST') { toast('Solo la secretaría técnica puede subir solicitudes', 'warn'); return; }
+  let json;
+  try { json = JSON.parse(await file.text()); }
+  catch (e) { toast('El archivo no es un JSON válido: ' + e.message, 'error'); return; }
+  if (!json || typeof json !== 'object') { toast('El JSON no contiene una solicitud reconocible', 'error'); return; }
+  const sol = nuevaSolicitudVacia();
+  try {
+    const roles = String(normalizarPMFBN(json).pmfbn.predio.rol || '').split(/[,;]/).map(s => norm(s.trim())).filter(Boolean);
+    const p = DB.predios.find(q => roles.includes(norm(q.rol)));
+    if (p) sol.predioId = p.id;
+    aplicarImportacion(sol, json);
+    if (p) { const pp = sol.pmfbn.predio; sol.pmfbn.predio = { ...pp, nombre: pp.nombre || p.nombre, rol: pp.rol || p.rol, comuna: pp.comuna || p.comuna, superficieTotal: pp.superficieTotal || p.supSIG, precipitacion: pp.precipitacion || p.precipitacion }; }
+  } catch (e) {
+    DB.seq.sol = Math.max(0, (DB.seq.sol || 1) - 1);
+    toast('No se pudo leer la solicitud: ' + e.message, 'error'); return;
+  }
+  sol.origenFormulario = 'externo';
+  registrar(sol, 'Solicitud creada en recepción desde archivo JSON', file.name);
+  DB.solicitudes.push(sol); guardar();
+  toast(`Solicitud ${sol.id} creada desde ${file.name}${sol.predioId ? '' : ' · seleccione el predio'}`, sol.predioId ? 'ok' : 'warn');
+  location.hash = `#exp/${sol.id}/ingreso`;
+}
+
 function vistaExpediente(main, id, tab) {
   const sol = solicitud(id);
   if (!sol) { main.innerHTML = '<div class="empty">Expediente no encontrado.</div>'; return; }

@@ -40,9 +40,9 @@ function vistaBandeja(main) {
   const titulo = { ST: 'Recepción, subsanaciones y notificaciones', JA: 'Asignación y revisión de expedientes', AN: 'Evaluaciones técnicas asignadas', AB: 'Análisis jurídicos asignados', JP: 'Resoluciones para firma' }[USUARIO.rol];
   const kpi = (l, v, s, cls = '') => `<div class="kpi ${cls}"><div class="kpi-l">${esc(l)}</div><div class="kpi-v">${v}</div>${s ? `<div class="kpi-s">${s}</div>` : ''}</div>`;
   const conteo = Object.keys(ESTADOS).map(k => [k, DB.solicitudes.filter(s => s.estado === k).length]).filter(([, n]) => n);
+  if (USUARIO.rol === 'ST') { vistaBandejaST(main, { pend, activas, porVencer, titulo }); return; }
   main.innerHTML = `
-    <div class="page-head"><div><div class="eyebrow">${esc(ROLES[USUARIO.rol])} · ${esc(USUARIO.oficina)}</div><h1>Mi bandeja</h1><p class="muted">${esc(titulo)}</p></div>
-      ${USUARIO.rol === 'ST' ? '<a class="btn" href="#nueva">+ Nueva solicitud</a>' : ''}</div>
+    <div class="page-head"><div><div class="eyebrow">${esc(ROLES[USUARIO.rol])} · ${esc(USUARIO.oficina)}</div><h1>Mi bandeja</h1><p class="muted">${esc(titulo)}</p></div></div>
     <div class="kpis">${kpi('Pendientes de mi acción', pend.length)}${kpi('Expedientes en trámite', activas.length)}
       ${kpi('Vencen en ≤ 15 días hábiles', porVencer.length, porVencer.length ? 'Revisar prioridad' : 'Sin urgencias', porVencer.length ? 'warn' : '')}
       ${kpi('Planes aprobados vigentes', DB.solicitudes.filter(s => s.resolucion && s.resolucion.tipo !== 'rechaza' && s.resolucion.vigenciaHasta >= hoyISO()).length)}</div>
@@ -64,6 +64,36 @@ function vistaBandeja(main) {
   };
   $('#f-q').addEventListener('input', render); $('#f-est').addEventListener('change', render); render();
   mapaGeneral($('#map-bandeja'), 'OpenStreetMap');
+}
+
+/* Bandeja de la secretaría técnica: indicadores clicables que despliegan su detalle */
+function vistaBandejaST(main, { pend, activas, porVencer, titulo }) {
+  const vigentes = DB.solicitudes.filter(s => s.resolucion && s.resolucion.tipo !== 'rechaza' && s.resolucion.vigenciaHasta >= hoyISO());
+  const porPlazo = l => l.slice().sort((a, b) => ((plazo(a) || {}).quedan ?? 999) - ((plazo(b) || {}).quedan ?? 999));
+  const K = {
+    pend: { l: 'Pendientes', list: pend, vacio: 'No tiene expedientes pendientes.' },
+    tramite: { l: 'Expedientes en trámite', list: porPlazo(activas), vacio: 'No hay expedientes en trámite.' },
+    vencen: { l: 'Vencen en ≤ 15 días hábiles', list: porPlazo(porVencer), vacio: 'Sin urgencias.', cls: porVencer.length ? 'warn' : '', sub: porVencer.length ? 'Revisar prioridad' : 'Sin urgencias' },
+    vigentes: { l: 'Planes aprobados vigentes', list: vigentes, vacio: 'No hay planes aprobados vigentes.' },
+  };
+  let sel = 'pend';
+  main.innerHTML = `
+    <div class="page-head"><div><div class="eyebrow">${esc(ROLES[USUARIO.rol])} · ${esc(USUARIO.oficina)}</div><h1>Mi bandeja</h1><p class="muted">${esc(titulo)}</p></div>
+      <div class="row-btns wrap"><button class="btn ghost" id="btn-subir-sol" type="button">⬆ Subir solicitud (.json)</button><input type="file" id="file-subir-sol" accept=".json,application/json" hidden>
+      <a class="btn" href="#nueva">+ Nueva solicitud</a></div></div>
+    <div class="kpis" role="tablist">${Object.entries(K).map(([k, o]) => `<button type="button" role="tab" class="kpi kpi-btn ${o.cls || ''}" data-kpi="${k}" style="text-align:left;cursor:pointer;font:inherit">
+      <div class="kpi-l">${esc(o.l)}</div><div class="kpi-v">${o.list.length}</div>${o.sub ? `<div class="kpi-s">${o.sub}</div>` : ''}</button>`).join('')}</div>
+    <div id="kpi-detalle"></div>`;
+  const pintar = () => {
+    $$('[data-kpi]', main).forEach(b => { const on = b.dataset.kpi === sel; b.setAttribute('aria-selected', on); b.style.outline = on ? '2px solid currentColor' : ''; });
+    $('#kpi-detalle').innerHTML = `<h2>${esc(K[sel].l)}</h2>${tablaSolicitudes(K[sel].list, K[sel].vacio)}`;
+    bindFilas($('#kpi-detalle'));
+  };
+  $$('[data-kpi]', main).forEach(b => b.addEventListener('click', () => { sel = b.dataset.kpi; pintar(); }));
+  const bSubir = $('#btn-subir-sol'), fSubir = $('#file-subir-sol');
+  bSubir.addEventListener('click', () => fSubir.click());
+  fSubir.addEventListener('change', async () => { const f = fSubir.files[0]; fSubir.value = ''; if (f) await subirSolicitudJSON(f); });
+  pintar();
 }
 
 const COLOR_ESTADO = { neutral: '#868e96', warn: '#e67700', info: '#1c7ed6', accent: '#7048e8', ok: '#2b8a3e', bad: '#c92a2a' };
