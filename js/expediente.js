@@ -71,7 +71,7 @@ function vistaExpediente(main, id, tab) {
   ({ resumen: tabResumen, ingreso: tabIngreso, formulario: tabFormulario, cartografia: tabCartografia, tecnico: tabTecnico, juridico: tabJuridico,
     revision: tabRevision, resolucion: tabResolucion, historial: tabHistorial })[tab](panel, sol);
 }
-function rerender() { route(); }
+function rerender() { const y = window.scrollY; route(); window.scrollTo(0, y); }
 
 function badgeTab(sol, k) {
   const dot = c => `<span class="tdot ${c}"></span>`;
