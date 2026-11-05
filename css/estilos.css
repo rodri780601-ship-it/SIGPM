@@ -96,6 +96,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green2);outline-
 .sec-box{background:var(--panel);border:1px solid var(--line);border-top:4px solid var(--c);border-radius:var(--r);padding:14px 16px;min-width:0;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .sec-box>h2{margin-top:0;padding-bottom:8px;border-bottom:1px solid var(--line);color:var(--c)}
 .sec-det{--c:#e67700;margin-bottom:20px}
+[data-kpi="firmar"],[data-k="firmar"]{--c:#2b8a3e}
 [data-kpi="recepcion"],[data-k="recepcion"]{--c:#495057}
 [data-kpi="asignar"],[data-k="asignar"],[data-kpi="pend"],[data-k="pend"]{--c:#1c7ed6}
 [data-kpi="evaluacion"],[data-k="evaluacion"],[data-kpi="tramite"],[data-k="tramite"]{--c:#7048e8}

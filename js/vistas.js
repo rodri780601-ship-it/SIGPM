@@ -44,6 +44,7 @@ function vistaBandeja(main) {
   const porPlazoK = l => l.slice().sort((a, b) => ((plazo(a) || {}).quedan ?? 999) - ((plazo(b) || {}).quedan ?? 999));
   const delEstado = e => porPlazoK(DB.solicitudes.filter(s => s.estado === e));
   const K = {
+    ...(USUARIO.rol === 'JP' ? { firmar: { l: 'Solicitudes por firmar resolución', list: delEstado('firma'), vacio: 'No hay solicitudes por firmar resolución.' } } : {}),
     recepcion: { l: 'Solicitudes en recepción', list: delEstado('recepcion'), vacio: 'No hay solicitudes en recepción.' },
     asignar: { l: 'Solicitudes por asignar', list: delEstado('asignacion'), vacio: 'No hay solicitudes por asignar.' },
     evaluacion: { l: 'Solicitudes en evaluación', list: delEstado('evaluacion'), vacio: 'No hay solicitudes en evaluación.' },
@@ -62,7 +63,7 @@ function vistaBandeja(main) {
   }
   const solsMapa = esAsig ? DB.solicitudes.filter(miaS) : DB.solicitudes;
   const conteoMapa = Object.keys(ESTADOS).map(k => [k, solsMapa.filter(s => s.estado === k).length]).filter(([, n]) => n);
-  let sel = esAsig ? 'evaluacion' : 'asignar';
+  let sel = esAsig ? 'evaluacion' : USUARIO.rol === 'JP' ? 'firmar' : 'asignar';
   main.innerHTML = `
     <div class="page-head"><div><div class="eyebrow">${esc(ROLES[USUARIO.rol])} · ${esc(USUARIO.oficina)}</div><h1>Mi bandeja</h1><p class="muted">${esc(titulo)}</p></div></div>
     <div class="kpis" role="tablist">${Object.entries(K).map(([k, o]) => `<button type="button" role="tab" class="kpi kpi-btn ${o.cls || ''}" data-kpi="${k}" style="text-align:left;cursor:pointer;font:inherit">
@@ -239,6 +240,19 @@ function vistaNormativa(main) {
       ['Vigencia del certificado de dominio', `${NORMA.vigenciaDominio} días hábiles`, 'Art. 22 d) D.S. 93'],
       ['Vigencia de personería de persona jurídica', `${NORMA.vigenciaPersoneria} días corridos`, 'Art. 23 b) D.S. 93'],
     ].map(r => `<tr>${r.map(x => `<td>${esc(x)}</td>`).join('')}</tr>`))}
+    <h2>Contenidos del plan de manejo (art. 14 D.S. 93)</h2>
+    <p class="muted">El plan de manejo debe contener, como mínimo, los siguientes elementos (resumen). El sistema marca cada letra como cumplida o pendiente según el formulario PMFBN y la cartografía cargados.</p>
+    ${t(['Letra', 'Contenido', 'Detalle', 'Qué verifica el sistema'], [
+      ['a', 'Individualización del interesado', 'Nombre o razón social y RUT del interesado y, si corresponde, de su representante legal; domicilio y datos de contacto para notificaciones.', 'Nombre y RUT del interesado informados.'],
+      ['b', 'Antecedentes generales del predio', 'Nombre, rol de avalúo, comuna y provincia, deslindes, inscripción de dominio y superficie total del predio.', 'Nombre y rol del predio informados.'],
+      ['c', 'Información del recurso forestal', 'Descripción del bosque del área a intervenir por rodal: tipo forestal, estructura, estado de desarrollo, densidad y superficie.', 'Al menos un rodal, y todos con tipo forestal y superficie mayor a 0.'],
+      ['d', 'Objetivos de manejo', 'Definición del objetivo general de manejo, coherente con el tipo de bosque y con el tratamiento propuesto.', 'Objetivo general definido.'],
+      ['e', 'Tratamiento silvicultural', 'Método de corta o tratamiento a aplicar en cada rodal, consecuente con los objetivos de manejo.', 'Todos los rodales con método asignado.'],
+      ['f', 'Calendarización de actividades', 'Programa de intervención por rodal y año: cortas y demás actividades, base de la vigencia del plan.', 'Todos los rodales con año de corta.'],
+      ['g', 'Prescripciones técnicas y criterios de corta', 'Normas técnicas para orientar las faenas: criterios de selección de árboles, intensidad de corta, regeneración y reforestación (ver también art. 9°).', 'Criterio de corta informado.'],
+      ['h', 'Medidas de protección ambiental y sanitaria', 'Medidas de protección de suelos, cursos de agua y humedales (Título III Ley 20.283; D.S. 82), fauna, incendios, plagas y enfermedades.', 'Al menos una medida de protección declarada.'],
+      ['i', 'Cartografía digital georreferenciada', 'Plano del predio y de las áreas a intervenir, con rodales y áreas de protección, en formato digital georreferenciado.', 'Cartografía cargada con al menos un polígono; la superficie SIG se contrasta con la declarada y con el límite predial.'],
+    ].map(r => `<tr><td><b>${r[0]})</b></td><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td>${esc(r[3])}</td></tr>`))}
     <h2>Pauta técnica</h2>${t(['Código', 'Requisito', 'Fuente', 'Verificación'], PAUTA_TECNICA.map(c => `<tr><td><b>${c.id}</b></td><td>${esc(c.txt)}</td><td>${esc(c.art)}</td><td>${c.auto ? '<span class="chip info">Automática + analista</span>' : '<span class="chip">Analista</span>'}</td></tr>`))}
     <h2>Pauta jurídica</h2>${t(['Código', 'Requisito', 'Fuente', 'Verificación'], PAUTA_JURIDICA.map(c => `<tr><td><b>${c.id}</b></td><td>${esc(c.txt)}</td><td>${esc(c.art)}</td><td>${c.auto ? '<span class="chip info">Automática + abogado</span>' : '<span class="chip">Abogado</span>'}</td></tr>`))}
     <h2>Zonas de protección de cursos de agua (D.S. 82)</h2>${t(['Sección de cauce', 'Zona de exclusión', 'Zona de manejo limitado'], [
