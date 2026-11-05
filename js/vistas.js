@@ -12,10 +12,8 @@ function chipPlazo(s) {
 const supSol = s => round2(sum(s.pmfbn.rodales || [], 'superficie'));
 const responsable = s => {
   if (s.estado === 'evaluacion' && s.asignacion) {
-    const t = [];
-    if (s.tecnico.estado !== 'enviado') t.push(usuario(s.asignacion.analista).nombre.split(' ')[0] + ' (técnico)');
-    if (s.juridico.estado !== 'enviado') t.push(usuario(s.asignacion.abogado).nombre.split(' ')[0] + ' (jurídico)');
-    return t.join(' · ') || '—';
+    const ok = i => i.estado === 'enviado' ? ' ✔' : '';
+    return [usuario(s.asignacion.analista).nombre.split(' ')[0] + ' (técnico)' + ok(s.tecnico), usuario(s.asignacion.abogado).nombre.split(' ')[0] + ' (jurídico)' + ok(s.juridico)].join(' · ');
   }
   const r = (ESTADOS[s.estado] || {}).rol; return r ? ROLES[r] : '—';
 };
