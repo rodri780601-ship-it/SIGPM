@@ -50,19 +50,31 @@ function vistaBandeja(main) {
     visar: { l: 'Solicitudes por visar', list: delEstado('revision'), vacio: 'No hay solicitudes por visar.' },
     vencen: { l: 'Vencen en ≤ 15 días hábiles', list: porPlazoK(porVencer), vacio: 'Sin urgencias.', cls: porVencer.length ? 'warn' : '', sub: porVencer.length ? 'Revisar prioridad' : 'Sin urgencias' },
   };
-  let sel = 'asignar';
+  const esAN = USUARIO.rol === 'AN', esAB = USUARIO.rol === 'AB', esAsig = esAN || esAB;
+  const campoAsig = esAB ? 'abogado' : 'analista';
+  const miaS = s => s.asignacion && s.asignacion[campoAsig] === USUARIO.id;
+  if (esAsig) {
+    const mias = DB.solicitudes.filter(s => miaS(s) && !['notificada', 'desistida'].includes(s.estado));
+    const vencenMias = mias.filter(s => { const p = plazo(s); return p && !s.resolucion && p.quedan <= 15; });
+    K.evaluacion = { l: 'Solicitudes en evaluación', list: porPlazoK(mias.filter(s => s.estado === 'evaluacion')), vacio: 'No tiene solicitudes en evaluación asignadas.' };
+    K.vencen = { l: 'Vencen en ≤ 15 días hábiles', list: porPlazoK(vencenMias), vacio: 'Sin urgencias.', cls: vencenMias.length ? 'warn' : '', sub: vencenMias.length ? 'Revisar prioridad' : 'Sin urgencias' };
+    ['recepcion', 'asignar', 'visar'].forEach(k => delete K[k]);
+  }
+  const solsMapa = esAsig ? DB.solicitudes.filter(miaS) : DB.solicitudes;
+  const conteoMapa = Object.keys(ESTADOS).map(k => [k, solsMapa.filter(s => s.estado === k).length]).filter(([, n]) => n);
+  let sel = esAsig ? 'evaluacion' : 'asignar';
   main.innerHTML = `
     <div class="page-head"><div><div class="eyebrow">${esc(ROLES[USUARIO.rol])} · ${esc(USUARIO.oficina)}</div><h1>Mi bandeja</h1><p class="muted">${esc(titulo)}</p></div></div>
     <div class="kpis" role="tablist">${Object.entries(K).map(([k, o]) => `<button type="button" role="tab" class="kpi kpi-btn ${o.cls || ''}" data-kpi="${k}" style="text-align:left;cursor:pointer;font:inherit">
       <div class="kpi-l">${esc(o.l)}</div><div class="kpi-v">${o.list.length}</div>${o.sub ? `<div class="kpi-s">${o.sub}</div>` : ''}</button>`).join('')}</div>
     <div id="kpi-detalle" class="sec-box sec-det mt"></div>
-    <div class="split mt">
-      <section class="sec-box sec-sol"><h2>📋 Todas las solicitudes</h2>
+    <div class="${esAsig ? '' : 'split '}mt">
+      ${esAsig ? '' : `<section class="sec-box sec-sol"><h2>📋 Todas las solicitudes</h2>
         <div class="filters"><input id="f-q" placeholder="Buscar por N°, predio, rol o interesado" aria-label="Buscar solicitudes">
           <select id="f-est" aria-label="Filtrar por estado"><option value="">Todos los estados</option>${Object.entries(ESTADOS).map(([k, e]) => `<option value="${k}">${esc(e.nombre)}</option>`).join('')}</select></div>
-        <div id="todas"></div></section>
-      <section class="sec-box sec-map"><h2>🗺️ Expedientes en el territorio</h2><div class="map-box"><div id="map-bandeja" class="map"></div></div>
-        <div class="legend-row">${conteo.map(([k, n]) => `<span>${chipEstado({ estado: k })} ${n}</span>`).join('')}</div></section>
+        <div id="todas"></div></section>`}
+      <section class="sec-box sec-map"><h2>🗺️ Expedientes en el territorio${esAsig ? ' (mis solicitudes asignadas)' : ''}</h2><div class="map-box"><div id="map-bandeja" class="map"></div></div>
+        <div class="legend-row">${conteoMapa.map(([k, n]) => `<span>${chipEstado({ estado: k })} ${n}</span>`).join('')}</div></section>
     </div>`;
   const pintarK = () => {
     $$('[data-kpi]', main).forEach(b => { b.setAttribute('aria-selected', b.dataset.kpi === sel); });
@@ -79,8 +91,8 @@ function vistaBandeja(main) {
       .sort((a, b) => (b.fechaIngreso || '9').localeCompare(a.fechaIngreso || '9'));
     $('#todas').innerHTML = tablaSolicitudes(l); bindFilas($('#todas'));
   };
-  $('#f-q').addEventListener('input', render); $('#f-est').addEventListener('change', render); render();
-  mapaGeneral($('#map-bandeja'), 'OpenStreetMap');
+  if (!esAsig) { $('#f-q').addEventListener('input', render); $('#f-est').addEventListener('change', render); render(); }
+  mapaGeneral($('#map-bandeja'), 'OpenStreetMap', esAsig ? miaS : null);
 }
 
 /* Bandeja de la secretaría técnica: indicadores clicables que despliegan su detalle */
@@ -115,12 +127,13 @@ function vistaBandejaST(main, { pend, activas, porVencer, titulo }) {
 }
 
 const COLOR_ESTADO = { neutral: '#868e96', warn: '#e67700', info: '#1c7ed6', accent: '#7048e8', ok: '#2b8a3e', bad: '#c92a2a' };
-function ultimaSolicitud(pid) { return DB.solicitudes.filter(s => s.predioId === pid).sort((a, b) => (b.fechaIngreso || '9').localeCompare(a.fechaIngreso || '9'))[0]; }
-function mapaGeneral(el, base) {
+function ultimaSolicitud(pid, filtro) { return DB.solicitudes.filter(s => s.predioId === pid && (!filtro || filtro(s))).sort((a, b) => (b.fechaIngreso || '9').localeCompare(a.fechaIngreso || '9'))[0]; }
+function mapaGeneral(el, base, filtro) {
   const { map, ctrl } = nuevoMapa(el, base);
   const g = L.featureGroup().addTo(map);
   DB.predios.forEach(p => {
-    const s = ultimaSolicitud(p.id);
+    const s = ultimaSolicitud(p.id, filtro);
+    if (filtro && !s) return;
     const col = s ? COLOR_ESTADO[ESTADOS[s.estado].color] : '#495057';
     L.geoJSON(p.geom, { style: { color: col, weight: 2.5, fillColor: col, fillOpacity: .25 } })
       .bindPopup(`<b>${esc(p.nombre)}</b><br>${esc(p.comuna)} · rol ${esc(p.rol)} · ${fmt(p.supSIG)} ha<br>${s ? `${esc(s.id)} · ${esc(ESTADOS[s.estado].nombre)}<br><a href="#exp/${s.id}">Abrir expediente</a> · ` : ''}<a href="#predio/${p.id}">Ficha predial</a>`)
