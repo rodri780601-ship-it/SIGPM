@@ -28,8 +28,6 @@ function pintarUsuario() {
   if (!USUARIO) return;
   $('#user-nom').textContent = USUARIO.nombre;
   $('#user-rol').textContent = `${ROLES[USUARIO.rol]} · ${USUARIO.oficina}`;
-  const n = pendientesDe(USUARIO).length;
-  $('#nav-badge').textContent = n; $('#nav-badge').hidden = !n;
   $$('.only-st').forEach(x => x.hidden = USUARIO.rol !== 'ST');
 }
 
