@@ -41,20 +41,37 @@ function vistaBandeja(main) {
   const kpi = (l, v, s, cls = '') => `<div class="kpi ${cls}"><div class="kpi-l">${esc(l)}</div><div class="kpi-v">${v}</div>${s ? `<div class="kpi-s">${s}</div>` : ''}</div>`;
   const conteo = Object.keys(ESTADOS).map(k => [k, DB.solicitudes.filter(s => s.estado === k).length]).filter(([, n]) => n);
   if (USUARIO.rol === 'ST') { vistaBandejaST(main, { pend, activas, porVencer, titulo }); return; }
+  const porPlazoK = l => l.slice().sort((a, b) => ((plazo(a) || {}).quedan ?? 999) - ((plazo(b) || {}).quedan ?? 999));
+  const delEstado = e => porPlazoK(DB.solicitudes.filter(s => s.estado === e));
+  const K = {
+    recepcion: { l: 'Solicitudes en recepción', list: delEstado('recepcion'), vacio: 'No hay solicitudes en recepción.' },
+    asignar: { l: 'Solicitudes por asignar', list: delEstado('asignacion'), vacio: 'No hay solicitudes por asignar.' },
+    evaluacion: { l: 'Solicitudes en evaluación', list: delEstado('evaluacion'), vacio: 'No hay solicitudes en evaluación.' },
+    visar: { l: 'Solicitudes por visar', list: delEstado('revision'), vacio: 'No hay solicitudes por visar.' },
+    vencen: { l: 'Vencen en ≤ 15 días hábiles', list: porPlazoK(porVencer), vacio: 'Sin urgencias.', cls: porVencer.length ? 'warn' : '', sub: porVencer.length ? 'Revisar prioridad' : 'Sin urgencias' },
+  };
+  let sel = 'asignar';
   main.innerHTML = `
     <div class="page-head"><div><div class="eyebrow">${esc(ROLES[USUARIO.rol])} · ${esc(USUARIO.oficina)}</div><h1>Mi bandeja</h1><p class="muted">${esc(titulo)}</p></div></div>
-    <div class="kpis">${kpi('Pendientes de mi acción', pend.length)}${kpi('Expedientes en trámite', activas.length)}
-      ${kpi('Vencen en ≤ 15 días hábiles', porVencer.length, porVencer.length ? 'Revisar prioridad' : 'Sin urgencias', porVencer.length ? 'warn' : '')}
-      ${kpi('Planes aprobados vigentes', DB.solicitudes.filter(s => s.resolucion && s.resolucion.tipo !== 'rechaza' && s.resolucion.vigenciaHasta >= hoyISO()).length)}</div>
-    <h2>Pendientes de mi acción</h2>${tablaSolicitudes(pend, 'No tiene expedientes pendientes.')}
+    <div class="kpis" role="tablist">${Object.entries(K).map(([k, o]) => `<button type="button" role="tab" class="kpi kpi-btn ${o.cls || ''}" data-kpi="${k}" style="text-align:left;cursor:pointer;font:inherit">
+      <div class="kpi-l">${esc(o.l)}</div><div class="kpi-v">${o.list.length}</div>${o.sub ? `<div class="kpi-s">${o.sub}</div>` : ''}</button>`).join('')}</div>
+    <div id="kpi-detalle" class="sec-box sec-det mt"></div>
     <div class="split mt">
-      <section><h2>Todas las solicitudes</h2>
+      <section class="sec-box sec-sol"><h2>📋 Todas las solicitudes</h2>
         <div class="filters"><input id="f-q" placeholder="Buscar por N°, predio, rol o interesado" aria-label="Buscar solicitudes">
           <select id="f-est" aria-label="Filtrar por estado"><option value="">Todos los estados</option>${Object.entries(ESTADOS).map(([k, e]) => `<option value="${k}">${esc(e.nombre)}</option>`).join('')}</select></div>
         <div id="todas"></div></section>
-      <section><h2>Expedientes en el territorio</h2><div class="map-box"><div id="map-bandeja" class="map"></div></div>
+      <section class="sec-box sec-map"><h2>🗺️ Expedientes en el territorio</h2><div class="map-box"><div id="map-bandeja" class="map"></div></div>
         <div class="legend-row">${conteo.map(([k, n]) => `<span>${chipEstado({ estado: k })} ${n}</span>`).join('')}</div></section>
     </div>`;
+  const pintarK = () => {
+    $$('[data-kpi]', main).forEach(b => { b.setAttribute('aria-selected', b.dataset.kpi === sel); });
+    $('#kpi-detalle').dataset.k = sel;
+    $('#kpi-detalle').innerHTML = `<h2>📌 ${esc(K[sel].l)}</h2>${tablaSolicitudes(K[sel].list, K[sel].vacio)}`;
+    bindFilas($('#kpi-detalle'));
+  };
+  $$('[data-kpi]', main).forEach(b => b.addEventListener('click', () => { sel = b.dataset.kpi; pintarK(); }));
+  pintarK();
   bindFilas(main);
   const render = () => {
     const q = norm($('#f-q').value), e = $('#f-est').value;
@@ -85,7 +102,8 @@ function vistaBandejaST(main, { pend, activas, porVencer, titulo }) {
       <div class="kpi-l">${esc(o.l)}</div><div class="kpi-v">${o.list.length}</div>${o.sub ? `<div class="kpi-s">${o.sub}</div>` : ''}</button>`).join('')}</div>
     <div id="kpi-detalle"></div>`;
   const pintar = () => {
-    $$('[data-kpi]', main).forEach(b => { const on = b.dataset.kpi === sel; b.setAttribute('aria-selected', on); b.style.outline = on ? '2px solid currentColor' : ''; });
+    $$('[data-kpi]', main).forEach(b => { b.setAttribute('aria-selected', b.dataset.kpi === sel); });
+    $('#kpi-detalle').dataset.k = sel;
     $('#kpi-detalle').innerHTML = `<h2>${esc(K[sel].l)}</h2>${tablaSolicitudes(K[sel].list, K[sel].vacio)}`;
     bindFilas($('#kpi-detalle'));
   };

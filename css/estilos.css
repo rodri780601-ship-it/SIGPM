@@ -93,6 +93,21 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green2);outline-
 .kpi-l{font-size:12px;color:var(--muted);font-weight:600}
 .kpi-v{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
 .kpi-s{font-size:12px;color:var(--muted)}
+.sec-box{background:var(--panel);border:1px solid var(--line);border-top:4px solid var(--c);border-radius:var(--r);padding:14px 16px;min-width:0;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.sec-box>h2{margin-top:0;padding-bottom:8px;border-bottom:1px solid var(--line);color:var(--c)}
+.sec-det{--c:#e67700;margin-bottom:20px}
+[data-kpi="recepcion"],[data-k="recepcion"]{--c:#495057}
+[data-kpi="asignar"],[data-k="asignar"],[data-kpi="pend"],[data-k="pend"]{--c:#1c7ed6}
+[data-kpi="evaluacion"],[data-k="evaluacion"],[data-kpi="tramite"],[data-k="tramite"]{--c:#7048e8}
+[data-kpi="visar"],[data-k="visar"],[data-kpi="vigentes"],[data-k="vigentes"]{--c:#0b7285}
+[data-kpi="vencen"],[data-k="vencen"]{--c:#e67700}
+.kpi-btn{border:2px solid var(--c);border-left-width:6px;color:inherit;transition:box-shadow .15s,transform .15s,background .15s}
+.kpi-btn .kpi-l{color:var(--c)}
+.kpi-btn:hover{transform:translateY(-1px);box-shadow:0 3px 8px rgba(0,0,0,.15)}
+.kpi-btn[aria-selected="true"]{background:color-mix(in srgb,var(--c) 16%,var(--panel));box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 35%,transparent),0 4px 10px rgba(0,0,0,.18);transform:translateY(-2px)}
+.kpi-btn[aria-selected="true"] .kpi-l{font-weight:800}
+.kpi-btn[aria-selected="true"] .kpi-v{color:var(--c)}
+.sec-sol{--c:#d6336c}.sec-map{--c:#2b8a3e}
 .split{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:20px}
 .filters{display:flex;gap:8px;margin-bottom:10px}
 .filters input{flex:2} .filters select{flex:1}
