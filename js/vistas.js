@@ -63,12 +63,15 @@ function vistaBandeja(main) {
   }
   const solsMapa = esAsig ? DB.solicitudes.filter(miaS) : DB.solicitudes;
   const conteoMapa = Object.keys(ESTADOS).map(k => [k, solsMapa.filter(s => s.estado === k).length]).filter(([, n]) => n);
+  const historico = esAN ? DB.solicitudes.filter(s => s.resolucion && s.tecnico && s.tecnico.estado === 'enviado' && (s.tecnico.por === USUARIO.id || miaS(s)))
+    .sort((a, b) => (b.resolucion.fecha || '').localeCompare(a.resolucion.fecha || '')) : [];
   let sel = esAsig ? 'evaluacion' : USUARIO.rol === 'JP' ? 'firmar' : 'asignar';
   main.innerHTML = `
     <div class="page-head"><div><div class="eyebrow">${esc(ROLES[USUARIO.rol])} · ${esc(USUARIO.oficina)}</div><h1>Mi bandeja</h1><p class="muted">${esc(titulo)}</p></div></div>
     <div class="kpis" role="tablist">${Object.entries(K).map(([k, o]) => `<button type="button" role="tab" class="kpi kpi-btn ${o.cls || ''}" data-kpi="${k}" style="text-align:left;cursor:pointer;font:inherit">
       <div class="kpi-l">${esc(o.l)}</div><div class="kpi-v">${o.list.length}</div>${o.sub ? `<div class="kpi-s">${o.sub}</div>` : ''}</button>`).join('')}</div>
     <div id="kpi-detalle" class="sec-box sec-det mt"></div>
+    ${esAN ? `<section class="sec-box sec-hist mt"><h2>🗂️ Histórico de solicitudes evaluadas con resolución (${historico.length})</h2>${tablaSolicitudes(historico, 'Aún no tiene solicitudes evaluadas con resolución.')}</section>` : ''}
     <div class="${esAsig ? '' : 'split '}mt">
       ${esAsig ? '' : `<section class="sec-box sec-sol"><h2>📋 Todas las solicitudes</h2>
         <div class="filters"><input id="f-q" placeholder="Buscar por N°, predio, rol o interesado" aria-label="Buscar solicitudes">
@@ -93,7 +96,16 @@ function vistaBandeja(main) {
     $('#todas').innerHTML = tablaSolicitudes(l); bindFilas($('#todas'));
   };
   if (!esAsig) { $('#f-q').addEventListener('input', render); $('#f-est').addEventListener('change', render); render(); }
-  mapaGeneral($('#map-bandeja'), 'OpenStreetMap', esAsig ? miaS : null);
+  const mapa = mapaGeneral($('#map-bandeja'), 'OpenStreetMap', esAsig ? miaS : null);
+  /* Al pasar el cursor por una solicitud de cualquier cuadro, se resalta su predio en el mapa */
+  let hl = null;
+  const solDeFila = tr => { const m = (tr.dataset.href || '').match(/^#exp\/([^/]+)/); return m && DB.solicitudes.find(s => s.id === decodeURIComponent(m[1])); };
+  main.onmouseover = e => {
+    const tr = e.target.closest('tr[data-href]'); const s = tr && solDeFila(tr);
+    if (hl) { mapa.resaltarPredio(hl, false); hl = null; }
+    if (s) { hl = s.predioId; mapa.resaltarPredio(hl, true); }
+  };
+  main.onmouseleave = () => { if (hl) { mapa.resaltarPredio(hl, false); hl = null; } };
 }
 
 /* Bandeja de la secretaría técnica: indicadores clicables que despliegan su detalle */
@@ -132,16 +144,25 @@ function ultimaSolicitud(pid, filtro) { return DB.solicitudes.filter(s => s.pred
 function mapaGeneral(el, base, filtro) {
   const { map, ctrl } = nuevoMapa(el, base);
   const g = L.featureGroup().addTo(map);
+  const capas = {};
   DB.predios.forEach(p => {
     const s = ultimaSolicitud(p.id, filtro);
     if (filtro && !s) return;
     const col = s ? COLOR_ESTADO[ESTADOS[s.estado].color] : '#495057';
-    L.geoJSON(p.geom, { style: { color: col, weight: 2.5, fillColor: col, fillOpacity: .25 } })
-      .bindPopup(`<b>${esc(p.nombre)}</b><br>${esc(p.comuna)} · rol ${esc(p.rol)} · ${fmt(p.supSIG)} ha<br>${s ? `${esc(s.id)} · ${esc(ESTADOS[s.estado].nombre)}<br><a href="#exp/${s.id}">Abrir expediente</a> · ` : ''}<a href="#predio/${p.id}">Ficha predial</a>`)
+    const poly = L.geoJSON(p.geom, { style: { color: col, weight: 2.5, fillColor: col, fillOpacity: .25 } });
+    poly.bindPopup(`<b>${esc(p.nombre)}</b><br>${esc(p.comuna)} · rol ${esc(p.rol)} · ${fmt(p.supSIG)} ha<br>${s ? `${esc(s.id)} · ${esc(ESTADOS[s.estado].nombre)}<br><a href="#exp/${s.id}">Abrir expediente</a> · ` : ''}<a href="#predio/${p.id}">Ficha predial</a>`)
       .bindTooltip(p.nombre).addTo(g);
     const c = turf.centroid(p.geom).geometry.coordinates;
-    L.circleMarker([c[1], c[0]], { radius: 6, color: '#fff', weight: 2, fillColor: col, fillOpacity: 1 }).bindTooltip(p.nombre).on('click', () => { location.hash = `#predio/${p.id}`; }).addTo(g);
+    const mk = L.circleMarker([c[1], c[0]], { radius: 6, color: '#fff', weight: 2, fillColor: col, fillOpacity: 1 }).bindTooltip(p.nombre).on('click', () => { location.hash = `#predio/${p.id}`; }).addTo(g);
+    capas[p.id] = { poly, mk, col };
   });
+  /* Resalta (o restablece) un predio desde fuera del mapa, p. ej. al pasar el cursor por una fila */
+  map.resaltarPredio = (pid, on) => {
+    const k = capas[pid]; if (!k || !g.hasLayer(k.mk)) return;
+    k.poly.setStyle(on ? { color: '#212529', weight: 5, fillOpacity: .6 } : { color: k.col, weight: 2.5, fillOpacity: .25 });
+    k.mk.setStyle(on ? { radius: 12, weight: 4, color: '#212529' } : { radius: 6, weight: 2, color: '#fff' });
+    if (on) { k.poly.bringToFront(); k.mk.bringToFront(); k.mk.openTooltip(); } else k.mk.closeTooltip();
+  };
   const ref = L.featureGroup([
     L.geoJSON(DB.ref.snaspe, { style: { color: '#2b8a3e', dashArray: '6 4', weight: 1.5, fillOpacity: .05 } }),
     L.geoJSON(DB.ref.humedales, { style: { color: '#0b7285', weight: 1.5, fillOpacity: .2 } }),
