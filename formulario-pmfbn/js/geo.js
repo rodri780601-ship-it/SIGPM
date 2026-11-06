@@ -147,70 +147,52 @@ const Geo = (() => {
     }
     return true;
   }
-  /** superficie aproximada de traslape entre polígonos (m²), 0 si sólo comparten borde */
+  /** Área común de dos anillos simples. Cada anillo equivale a la suma con signo de los trapecios
+      bajo sus aristas, y dos trapecios se traslapan en el área bajo el mínimo de sus aristas. Es exacto
+      con bordes compartidos, donde un recorte por intersecciones de aristas se vuelve degenerado. */
+  function ringOverlap(r1, r2) {
+    const todos = r1.concat(r2);
+    const x0 = Math.min(...todos.map(p => p[0])), y0 = Math.min(...todos.map(p => p[1]));
+    const aristas = r => {
+      const out = [];
+      for (let i = 0; i < r.length; i++) {
+        const a = r[i], b = r[(i + 1) % r.length];
+        const xa = a[0] - x0, xb = b[0] - x0, ya = a[1] - y0, yb = b[1] - y0;
+        if (xa < xb) out.push({ x1: xa, x2: xb, y1: ya, y2: yb, s: 1 });
+        else if (xb < xa) out.push({ x1: xb, x2: xa, y1: yb, y2: ya, s: -1 });
+      }
+      return out;
+    };
+    const altura = (e, x) => e.y1 + (e.y2 - e.y1) * (x - e.x1) / (e.x2 - e.x1);
+    const A1 = aristas(r1), A2 = aristas(r2);
+    let total = 0;
+    for (const e of A1) for (const f of A2) {
+      const a = Math.max(e.x1, f.x1), b = Math.min(e.x2, f.x2);
+      if (a >= b) continue;
+      const ea = altura(e, a), eb = altura(e, b), fa = altura(f, a), fb = altura(f, b);
+      const da = ea - fa, db = eb - fb;
+      let area;
+      if (da * db >= 0) area = (b - a) * (Math.min(ea, fa) + Math.min(eb, fb)) / 2;
+      else {
+        const t = da / (da - db), xc = a + t * (b - a), yc = ea + t * (eb - ea);
+        area = (xc - a) * (Math.min(ea, fa) + yc) / 2 + (b - xc) * (yc + Math.min(eb, fb)) / 2;
+      }
+      total += e.s * f.s * area;
+    }
+    return Math.abs(total); // el signo solo refleja la orientación de los anillos
+  }
+  /** superficie de traslape entre polígonos (m²), 0 si sólo comparten borde; descuenta los agujeros */
   function overlapArea(g1, g2) {
     const b1 = bbox(g1), b2 = bbox(g2);
     if (!b1 || !b2 || b1[2] <= b2[0] || b2[2] <= b1[0] || b1[3] <= b2[1] || b2[3] <= b1[1]) return 0;
     let s = 0;
-    for (const p1 of polys(g1)) for (const p2 of polys(g2)) for (const r of clipPolygon(p1[0], p2[0])) s += Math.abs(ringArea(r));
-    return s;
+    for (const p1 of polys(g1)) for (const p2 of polys(g2)) {
+      p1.forEach((r1, i) => p2.forEach((r2, j) => { s += (i ? -1 : 1) * (j ? -1 : 1) * ringOverlap(r1, r2); }));
+    }
+    return Math.max(0, s);
   }
 
-  /* ---------------- Recorte de polígonos (Greiner–Hormann) ---------------- */
-  function clipPolygon(subject, clip) {
-    const close = r => (r[0][0] === r[r.length - 1][0] && r[0][1] === r[r.length - 1][1]) ? r.slice(0, -1) : r.slice();
-    let S = close(subject), C = close(clip);
-    // perturbación mínima para evitar degeneraciones (vértices sobre aristas)
-    const eps = 1e-7;
-    C = C.map(([x, y], i) => [x + eps * ((i * 7919) % 13 - 6) * 0.13, y + eps * ((i * 104729) % 11 - 5) * 0.17]);
-    const mk = (pts) => { const nodes = pts.map(p => ({ x: p[0], y: p[1], inter: false, entry: false, neighbor: null, alpha: 0, visited: false })); nodes.forEach((n, i) => { n.next = nodes[(i + 1) % nodes.length]; n.prev = nodes[(i - 1 + nodes.length) % nodes.length]; }); return nodes; };
-    const sN = mk(S), cN = mk(C);
-    const insert = (start, end, node) => { let cur = start.next; while (cur !== end && cur.alpha < node.alpha) cur = cur.next; node.next = cur; node.prev = cur.prev; cur.prev.next = node; cur.prev = node; };
-    let any = false;
-    for (const s0 of sN) {
-      const s1 = s0.next.inter ? null : null;
-      let sEnd = s0.next; while (sEnd.inter) sEnd = sEnd.next;
-      for (const c0 of cN) {
-        let cEnd = c0.next; while (cEnd.inter) cEnd = cEnd.next;
-        const x = segInter([s0.x, s0.y], [sEnd.x, sEnd.y], [c0.x, c0.y], [cEnd.x, cEnd.y]);
-        if (x && x.t > 0 && x.t < 1 && x.u > 0 && x.u < 1) {
-          any = true;
-          const a = { x: x.p[0], y: x.p[1], inter: true, alpha: x.t, visited: false }, b = { x: x.p[0], y: x.p[1], inter: true, alpha: x.u, visited: false };
-          a.neighbor = b; b.neighbor = a; insert(s0, sEnd, a); insert(c0, cEnd, b);
-        }
-      }
-    }
-    if (!any) {
-      if (pointInRing(S[0], C.concat([C[0]]))) return [S.concat([S[0]])];
-      if (pointInRing(C[0], S.concat([S[0]]))) return [C.concat([C[0]])];
-      return [];
-    }
-    const mark = (startNode, other) => {
-      let inside = pointInRing([startNode.x, startNode.y], other.concat([other[0]]));
-      let n = startNode;
-      do { if (n.inter) { n.entry = !inside; inside = !inside; } n = n.next; } while (n !== startNode);
-    };
-    mark(sN[0], C); mark(cN[0], S);
-    const result = [];
-    const firstUnvisited = () => { let n = sN[0]; do { if (n.inter && !n.visited) return n; n = n.next; } while (n !== sN[0]); return null; };
-    let cur;
-    while ((cur = firstUnvisited())) {
-      const ring = []; let n = cur;
-      let guard = 0;
-      do {
-        n.visited = true; if (n.neighbor) n.neighbor.visited = true;
-        ring.push([n.x, n.y]);
-        if (n.entry) { do { n = n.next; ring.push([n.x, n.y]); if (n.inter) { n.visited = true; if (n.neighbor) n.neighbor.visited = true; } } while (!n.inter); }
-        else { do { n = n.prev; ring.push([n.x, n.y]); if (n.inter) { n.visited = true; if (n.neighbor) n.neighbor.visited = true; } } while (!n.inter); }
-        n = n.neighbor;
-        if (++guard > 10000) break;
-      } while (!(n.x === cur.x && n.y === cur.y) || !n.visited && false);
-      const clean = []; for (const p of ring) { const l = clean[clean.length - 1]; if (!l || Math.hypot(l[0] - p[0], l[1] - p[1]) > 1e-6) clean.push(p); }
-      while (clean.length > 1 && Math.hypot(clean[0][0] - clean[clean.length - 1][0], clean[0][1] - clean[clean.length - 1][1]) < 1e-6) clean.pop();
-      if (clean.length >= 3) { clean.push(clean[0]); if (Math.abs(ringArea(clean)) > 1e-6) result.push(clean); }
-    }
-    return result;
-  }
+  /* ---------------- Recorte ---------------- */
   function clipLine(line, poly) {
     const out = []; let cur = [];
     const inside = p => pointInPolygon(p, poly);
@@ -228,7 +210,9 @@ const Geo = (() => {
     if (cur.length > 1) out.push(cur);
     return out;
   }
-  /** Recorta una geometría UTM al polígono contenedor; devuelve geometría o null */
+  /** Recorta una geometría UTM al polígono contenedor; devuelve geometría o null.
+      Los polígonos usan la biblioteca polygon-clipping (js/vendor), que admite bordes comunes y agujeros
+      y lanza una excepción si no puede resolver el recorte. Se descartan astillas numéricas (< 0,01 m²). */
   function clipTo(g, container) {
     if (g.type === 'Point') return pointInPolygon(g.coordinates, container) ? g : null;
     if (g.type === 'MultiPoint') { const c = g.coordinates.filter(p => pointInPolygon(p, container)); return c.length ? { type: 'MultiPoint', coordinates: c } : null; }
@@ -236,8 +220,8 @@ const Geo = (() => {
       const parts = lines(g).flatMap(l => clipLine(l, container));
       return !parts.length ? null : parts.length === 1 ? { type: 'LineString', coordinates: parts[0] } : { type: 'MultiLineString', coordinates: parts };
     }
-    const parts = [];
-    for (const p of polys(g)) for (const cp of polys(container)) for (const r of clipPolygon(p[0], cp[0])) parts.push([r]);
+    const areaNeta = p => p.reduce((s, r, i) => s + (i ? -1 : 1) * Math.abs(ringArea(r)), 0);
+    const parts = polygonClipping.intersection(polys(g), polys(container)).filter(p => areaNeta(p) >= 0.01);
     return !parts.length ? null : parts.length === 1 ? { type: 'Polygon', coordinates: parts[0] } : { type: 'MultiPolygon', coordinates: parts };
   }
   function circle(c, r, n = 72) { const ring = []; for (let i = 0; i <= n; i++) { const a = 2 * Math.PI * i / n; ring.push([c[0] + r * Math.cos(a), c[1] + r * Math.sin(a)]); } return { type: 'Polygon', coordinates: [ring] }; }
@@ -486,5 +470,5 @@ const Geo = (() => {
     return [g];
   }
 
-  return { toUTM, fromUTM, zoneOf, merc, unmerc, mapCoords, geomToUTM, geomFromUTM, allCoords, bbox, mergeBbox, polys, lines, points, area, length, centroid, pointInPolygon, pointInRing, segDist, distance, selfIntersections, within, overlapArea, clipPolygon, clipTo, circle, prjUTM, parsePrj, parseShp, parseDbf, readShapefiles, writeShapefile, writeDbf, parseKml, toKml, parseGeoJSON, explode, ringArea };
+  return { toUTM, fromUTM, zoneOf, merc, unmerc, mapCoords, geomToUTM, geomFromUTM, allCoords, bbox, mergeBbox, polys, lines, points, area, length, centroid, pointInPolygon, pointInRing, segDist, distance, selfIntersections, within, overlapArea, clipTo, circle, prjUTM, parsePrj, parseShp, parseDbf, readShapefiles, writeShapefile, writeDbf, parseKml, toKml, parseGeoJSON, explode, ringArea };
 })();

@@ -2,6 +2,7 @@
    Puente SIGPM ⇄ Aplicación web de plan de manejo (PMFBN)
    Se activa solo cuando la aplicación se abre dentro de SIGPM (iframe).
    - Recibe:  { tipo: 'sigpm:inicio', solicitud, proyecto, interesado, profesional, predio, cartografia, soloLectura }
+   - Recibe:  { tipo: 'sigpm:enviar' } para devolver el proyecto sin usar el botón (plan de ejemplo)
    - Envía:   { tipo: 'pmfbn:datos', datos: { formato: 'pmfbn-app', proyecto, resumen, revision } }
    La aplicación original no se modifica; este archivo se agrega al final de index.html.
    ========================================================================== */
@@ -75,16 +76,19 @@
         : '<button id="sigpm-enviar" style="border:0;border-radius:7px;padding:7px 14px;background:#f2c14e;color:#3b2d00;font-weight:700;cursor:pointer">Enviar a SIGPM</button>');
     document.body.insertBefore(bar, document.body.firstChild);
     const b = document.getElementById('sigpm-enviar');
-    if (b) b.addEventListener('click', () => {
-      App.save();
-      const r = resumen();
-      const errores = r.revision.filter(x => x.lvl === 'err').length;
-      window.parent.postMessage({ tipo: 'pmfbn:datos', datos: { formato: 'pmfbn-app', version: 1, proyecto: JSON.parse(JSON.stringify(S)), resumen: r.resumen, revision: r.revision, cartografia: r.cartografia, erroresRevision: errores } }, '*');
-    });
+    if (b) b.addEventListener('click', enviar);
+  }
+
+  function enviar() {
+    App.save();
+    const r = resumen();
+    const errores = r.revision.filter(x => x.lvl === 'err').length;
+    window.parent.postMessage({ tipo: 'pmfbn:datos', datos: { formato: 'pmfbn-app', version: 1, proyecto: JSON.parse(JSON.stringify(S)), resumen: r.resumen, revision: r.revision, cartografia: r.cartografia, erroresRevision: errores } }, '*');
   }
 
   window.addEventListener('message', ev => {
     const d = ev.data;
+    if (d && d.tipo === 'sigpm:enviar' && ctx && !ctx.soloLectura) { enviar(); return; }
     if (!d || d.tipo !== 'sigpm:inicio') return;
     ctx = d;
     cargar(d.proyecto && d.proyecto.f ? d.proyecto : prellenado(d));

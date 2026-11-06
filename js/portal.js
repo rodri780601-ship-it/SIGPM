@@ -222,12 +222,26 @@ function vistaProyecto(main, id, tab) {
 }
 function accionesProyecto(pry) {
   const a = [];
-  if (puedeEditarProyecto(pry)) a.push('<button class="btn" id="py-env">Finalizar: enviar al propietario</button>');
+  if (puedeEditarProyecto(pry)) a.push('<button class="btn ghost" id="py-ejemplo">Llenar con ejemplo</button>', '<button class="btn" id="py-env">Finalizar: enviar al propietario</button>');
   if (pry.propietarioId === USUARIO.id && pry.etapa === 'revision') a.push('<button class="btn ghost" id="py-dev">Devolver al consultor</button>', '<button class="btn" id="py-conaf">Conforme: enviar a CONAF</button>');
   const espera = pry.etapa === 'enviado' ? 'Proyecto terminado.' : proyectoCongelado(pry) ? 'Sin acciones mientras el proyecto esté congelado.'
     : pry.etapa === 'revision' ? 'Esperando la revisión del propietario.' : 'El consultor está elaborando el plan.';
   $('#acciones').innerHTML = `<div class="who">Actuando como <b>${esc(USUARIO.nombre)}</b> · ${esc(ROLES[USUARIO.rol])}</div><div class="row-btns wrap">${a.join('') || `<span class="muted">${esc(espera)}</span>`}</div>`;
   const on = (id, fn) => { const b = $('#' + id); if (b) b.addEventListener('click', fn); };
+  on('py-ejemplo', async () => {
+    const conDatos = !!pry.pmfbnProyecto || !!pry.cartografia || (pry.pmfbn.rodales || []).length > 0;
+    if (conDatos) {
+      const ok = await modal({ titulo: 'Llenar con ejemplo', html: '<p>Lo que lleva avanzado en el formulario y la cartografía se <b>reemplazará</b> por un plan de ejemplo con datos ficticios. Esto no se puede deshacer.</p>', botones: [{ txt: 'Cancelar' }, { txt: 'Reemplazar', valor: true, cls: 'danger' }] });
+      if (!ok) return;
+    }
+    const b = $('#py-ejemplo'); b.disabled = true; b.textContent = 'Generando plan…';
+    try {
+      const d = await llenarProyectoEjemplo(pry);
+      const n = (d.revision || []).filter(x => x.lvl === 'err').length;
+      toast(n ? `Plan de ejemplo cargado, con ${n} errores en la revisión de la aplicación` : 'Plan de ejemplo cargado: revise los datos y envíelo al propietario', n ? 'warn' : 'ok');
+    } catch (e) { toast(e.message, 'error'); }
+    rerender();
+  });
   on('py-env', async () => {
     const f = faltantesProyecto(pry);
     if (f.length) { await modal({ titulo: 'Falta completar el proyecto', ancho: 640, html: `<p>Antes de enviarlo al propietario falta:</p><ul class="list">${f.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` }); return; }

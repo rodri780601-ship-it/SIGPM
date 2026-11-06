@@ -677,19 +677,22 @@ const Carto = (() => {
   }
   function recortar() {
     const lp = feats('Limite_Predial'); if (!lp.length) { toast('Se requiere el límite predial.', 'warn'); return; }
-    const z = zona(); let ch = 0, del = 0;
+    const z = zona(); let ch = 0, del = 0, fallos = 0;
     const cont = lp.length === 1 ? utm(lp[0].g) : { type: 'MultiPolygon', coordinates: lp.flatMap(f => Geo.polys(utm(f.g))) };
     for (const L of CAPAS.filter(c => c.grp === 'reconocida' && !c.noClip)) {
       const out = [];
       for (const f of feats(L.k)) {
         const gu = utm(f.g); if (Geo.within(gu, cont, 0.5)) { out.push(f); continue; }
-        const cl = Geo.clipTo(gu, cont); if (!cl) { del++; continue; }
+        let cl;
+        try { cl = Geo.clipTo(gu, cont); } catch (e) { console.error(e); fallos++; out.push(f); continue; } // sin recorte válido, se conserva el original
+        if (!cl) { del++; continue; }
         for (const part of Geo.explode(cl)) { const nf = { id: uid(), g: Geo.geomFromUTM(part, z), p: Object.assign({}, f.p) }; autoProps(L.k, nf); out.push(nf); }
         ch++;
       }
       C().layers[L.k] = out;
     }
-    changed(); refreshLayers(); refreshPanel(); toast(`${ch} elemento(s) recortados, ${del} eliminado(s) por quedar fuera del predio.`, 'ok');
+    changed(); refreshLayers(); refreshPanel();
+    toast(`${ch} elemento(s) recortados, ${del} eliminado(s) por quedar fuera del predio.${fallos ? ` ${fallos} no se pudieron recortar y se conservaron sin cambios: revise su geometría.` : ''}`, fallos ? 'warn' : 'ok');
   }
   function separar() {
     const list = feats(active), out = []; let n = 0;

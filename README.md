@@ -66,6 +66,8 @@ En su ficha predial, el propietario tiene dos vistas del historial: **Planes con
 
 Los proyectos se guardan en `DB.proyectos`, separados de las solicitudes, de modo que CONAF no ve borradores. En la maqueta el envío del código es un correo simulado, visible en la bandeja del consultor, y los permisos se aplican solo en el navegador: en producción deben validarse en el servidor.
 
+El botón **Llenar con ejemplo** del proyecto genera un plan completo con datos ficticios a partir de la ficha predial (`js/ejemplo.js`), incluidos inventario y cartografía. La aplicación calcula y revisa ese plan igual que uno real, y el historial del proyecto deja constancia de que es un ejemplo.
+
 Para probarlo: `consultor1` tiene un código por usar del predio Los Ulmos Bajo y un proyecto congelado en Hijuela Cuesta Alerce, que se reactiva con un ticket de `propietario2`.
 
 ## Análisis espacial automático
@@ -105,8 +107,10 @@ js/evaluacion.js    verificaciones automáticas, borradores de informes y de la 
 js/vistas.js        bandeja, mapa, ficha predial, registro público, normativa
 js/expediente.js    expediente con pestañas y acciones por rol
 js/portal.js        portal de propietarios y consultores: tickets y proyectos
+js/ejemplo.js       plan de ejemplo ficticio para el consultor
 js/app.js           navegación y arranque
 formulario-pmfbn/   Aplicación web de plan de manejo + js/sigpm-puente.js (integración)
+                    js/vendor/: polygon-clipping 0.15.7 (MIT), para recortar polígonos al límite predial
 ejemplos/           archivos para probar la carga de un predio nuevo e importar un formulario
 ```
 
