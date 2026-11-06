@@ -5,6 +5,7 @@ const TABS = [
   ['resumen', 'Resumen'], ['ingreso', 'Ingreso y antecedentes'], ['formulario', 'Formulario PMFBN'], ['cartografia', 'Cartografía y análisis'],
   ['tecnico', 'Evaluación técnica'], ['juridico', 'Informe jurídico'], ['revision', 'Revisión jefatura'], ['resolucion', 'Resolución'], ['historial', 'Historial'],
 ];
+const TABS_PROPIETARIO = ['resolucion', 'formulario']; // sin antecedentes, informes ni análisis internos
 const REVISION_ITEMS = [
   ['r1', 'La pauta técnica está completa y cada «no cumple» está fundado'],
   ['r2', 'Las decisiones por rodal son coherentes con el análisis espacial y la visita a terreno'],
@@ -49,7 +50,9 @@ async function subirSolicitudJSON(file) {
 function vistaExpediente(main, id, tab) {
   const sol = solicitud(id);
   if (!sol) { main.innerHTML = '<div class="empty">Expediente no encontrado.</div>'; return; }
-  tab = TABS.some(t => t[0] === tab) ? tab : (sol.estado === 'recepcion' && USUARIO.rol === 'ST' ? 'ingreso' : 'resumen');
+  if (!puedeVerSolicitud(sol)) { sinPermiso(main); return; }
+  const pestanas = USUARIO.rol === 'PR' ? TABS.filter(t => TABS_PROPIETARIO.includes(t[0])) : TABS;
+  tab = pestanas.some(t => t[0] === tab) ? tab : USUARIO.rol === 'PR' ? 'resolucion' : (sol.estado === 'recepcion' && USUARIO.rol === 'ST' ? 'ingreso' : 'resumen');
   const p = predio(sol.predioId);
   const pl = plazo(sol);
   const paso = ESTADOS[sol.estado].paso;
@@ -64,7 +67,7 @@ function vistaExpediente(main, id, tab) {
     </div>
     <ol class="stepper">${PASOS.map((n, i) => `<li class="${sol.estado === 'desistida' ? (i === 0 ? 'bad' : '') : i < paso ? 'done' : i === paso ? 'now' : ''}">${esc(n)}</li>`).join('')}</ol>
     <div class="actions" id="acciones"></div>
-    <nav class="tabs" role="tablist">${TABS.map(([k, l]) => `<a role="tab" href="#exp/${sol.id}/${k}" class="${k === tab ? 'on' : ''}" aria-selected="${k === tab}">${esc(l)}${badgeTab(sol, k)}</a>`).join('')}</nav>
+    <nav class="tabs" role="tablist">${pestanas.map(([k, l]) => `<a role="tab" href="#exp/${sol.id}/${k}" class="${k === tab ? 'on' : ''}" aria-selected="${k === tab}">${esc(l)}${badgeTab(sol, k)}</a>`).join('')}</nav>
     <div id="panel" class="panel"></div>`;
   renderAcciones(sol);
   const panel = $('#panel');
@@ -199,6 +202,7 @@ function tabResumen(el, sol) {
     <table class="kv"><tr><th>Interesado</th><td>${esc(sol.interesado.nombre || '—')} · RUT ${esc(sol.interesado.rut || '—')} ${sol.interesado.tipo === 'juridica' ? `· rep. ${esc(sol.interesado.representante.nombre)}` : ''}</td></tr>
       <tr><th>Profesional</th><td>${esc(sol.profesional.nombre || '—')} · ${esc(sol.profesional.titulo)}</td></tr>
       <tr><th>Formulario</th><td>${sol.origenFormulario === 'externo' ? 'Importado desde «Aplicación web de plan de manejo»' : 'Formulario interno'} · ${(sol.pmfbn.rodales || []).length} rodales · objetivo: ${esc(OBJETIVOS[sol.pmfbn.objetivo.general] || '—')}</td></tr>
+      ${sol.origenProyecto ? `<tr><th>Origen</th><td>Proyecto ${esc(sol.origenProyecto.proyectoId)}, elaborado por ${esc(usuario(sol.origenProyecto.consultorId).nombre)} y enviado por el propietario</td></tr>` : ''}
       <tr><th>Asignación</th><td>${sol.asignacion ? `${esc(usuario(sol.asignacion.analista).nombre)} (analista) · ${esc(usuario(sol.asignacion.abogado).nombre)} (abogado) · ${fmtFecha(sol.asignacion.fecha)}` : 'Sin asignar'}</td></tr>
       ${sol.resolucion ? `<tr><th>Resolución</th><td><a href="#exp/${sol.id}/resolucion">N° ${esc(sol.resolucion.numero)}</a> de ${fmtFecha(sol.resolucion.fecha)} · ${esc(RESUELVE[sol.resolucion.tipo])} · ${fmt(sol.resolucion.supAprobada)} ha</td></tr>` : ''}
       ${sol.requerimientos.length ? `<tr><th>Requerimientos art. 31</th><td>${sol.requerimientos.map(r => `${fmtFecha(r.fecha)}: ${esc(r.detalle)} — ${r.fechaRespuesta ? `subsanado ${fmtFecha(r.fechaRespuesta)}` : `plazo ${fmtFecha(r.plazo)}`}`).join('<br>')}</td></tr>` : ''}</table>
@@ -329,11 +333,11 @@ function tabCartografia(el, sol) {
         <p class="muted small">Polígonos con un campo de número de rodal. Formatos: .zip (shapefile), .geojson o .kml.</p>
         <label>Archivo<input type="file" id="ca-file" accept=".zip,.geojson,.json,.kml"></label><label>Sistema de coordenadas ${selSRC('ca-src')}</label>
         <div class="row-btns wrap"><button class="btn sm" id="ca-go">Cargar área</button>${p.celdas && p.celdas.length ? '<button class="btn sm ghost" id="ca-demo">Usar rodales de ejemplo del predio</button>' : ''}</div></section>
-        <section class="card"><h3>Cursos de agua del predio</h3><p class="muted small">Se agregan a la ficha predial. Defina la sección del cauce (D.S. 82 art. 1° p).</p>
+        ${sol.esProyecto ? '' : `<section class="card"><h3>Cursos de agua del predio</h3><p class="muted small">Se agregan a la ficha predial. Defina la sección del cauce (D.S. 82 art. 1° p).</p>
         <label>Archivo de líneas<input type="file" id="cu-file" accept=".zip,.geojson,.json,.kml"></label>
         <div class="fgrid"><label>Sección<select id="cu-sec"><option value="entre02y05">0,2–0,5 m²</option><option value="mayor05">> 0,5 m²</option><option value="menor02">< 0,2 m²</option></select></label>
         <label>Régimen<select id="cu-per"><option value="1">Permanente</option><option value="0">No permanente</option></select></label></div>
-        <label>Sistema de coordenadas ${selSRC('cu-src')}</label><div class="row-btns"><button class="btn sm ghost" id="cu-go">Agregar cursos</button></div></section>` : ''}
+        <label>Sistema de coordenadas ${selSRC('cu-src')}</label><div class="row-btns"><button class="btn sm ghost" id="cu-go">Agregar cursos</button></div></section>`}` : ''}
       ${an ? `<section class="card"><h3>Análisis normativo automático</h3>
         <div class="mini-kpis"><div><b>${fmt(an.supDecl)}</b><span>ha declaradas</span></div><div><b>${fmt(an.supSIG)}</b><span>ha SIG</span></div><div><b class="${an.supObjetable ? 'bad-txt' : ''}">${fmt(an.supObjetable)}</b><span>ha con prohibición</span></div></div>
         ${alertasHTML(an)}</section>` : '<div class="empty">Cargue la cartografía del área a intervenir para ejecutar el análisis.</div>'}
@@ -366,7 +370,7 @@ function tabCartografia(el, sol) {
       registrar(sol, 'Cartografía del área a intervenir cargada', 'Rodales de ejemplo de la ficha predial');
       after('Se cargaron rodales de ejemplo y se crearon en el formulario');
     });
-    $('#cu-go').addEventListener('click', async () => {
+    const cuGo = $('#cu-go'); if (cuGo) cuGo.addEventListener('click', async () => {
       const f = $('#cu-file').files[0]; if (!f) { toast('Seleccione un archivo', 'warn'); return; }
       try {
         const { fc } = await cargarCapa(f, $('#cu-src').value, 'linea');

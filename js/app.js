@@ -4,12 +4,14 @@
 function route() {
   limpiarMapas();
   const main = $('#main');
+  main.onmouseover = main.onmouseleave = null; // la bandeja los fija para resaltar predios en su mapa
   const h = decodeURIComponent((location.hash || '#bandeja').slice(1)).split('/');
   const [v, a, b] = h;
-  $$('.nav a').forEach(x => x.classList.toggle('on', x.dataset.v === v || (v === 'exp' && x.dataset.v === 'bandeja') || (v === 'predio' && x.dataset.v === 'mapa')));
+  $$('.nav a').forEach(x => x.classList.toggle('on', x.dataset.v === v || (['exp', 'proyecto'].includes(v) && x.dataset.v === 'bandeja') || (v === 'predio' && x.dataset.v === (esExterno() ? 'bandeja' : 'mapa'))));
   try {
     switch (v) {
-      case 'mapa': vistaMapa(main); break;
+      case 'mapa': if (esExterno()) sinPermiso(main); else vistaMapa(main); break;
+      case 'proyecto': vistaProyecto(main, a, b); break;
       case 'predio': vistaPredio(main, a); break;
       case 'registro': vistaRegistro(main); break;
       case 'normativa': vistaNormativa(main); break;
@@ -29,6 +31,7 @@ function pintarUsuario() {
   $('#user-nom').textContent = USUARIO.nombre;
   $('#user-rol').textContent = `${ROLES[USUARIO.rol]} · ${USUARIO.oficina}`;
   $$('.only-st').forEach(x => x.hidden = USUARIO.rol !== 'ST');
+  $$('.only-int').forEach(x => x.hidden = esExterno());
 }
 
 /* ---------- Pantalla de ingreso (estilo portada institucional) ---------- */
@@ -50,7 +53,7 @@ function mostrarLogin(msg) {
     <div class="lg-main">
       <section class="lg-carrusel" aria-label="Bosques nativos de Chile">${PORTADA.map(([src, alt], i) => `<figure class="lg-slide ${i ? '' : 'activo'}" style="background-image:url('${src}')" role="img" aria-label="${esc(alt)}"></figure>`).join('')}</section>
       <section class="lg-card lg-ingreso" aria-labelledby="login-t">
-        <h1 id="login-t">Ingreso de funcionarios</h1>
+        <h1 id="login-t">Ingreso de usuarios</h1>
         <p class="muted small">Sistema de Gestión de Planes de Manejo de Bosque Nativo</p>
         <form id="login-form" autocomplete="off" novalidate>
           <label for="lg-u">Usuario</label><input id="lg-u" name="usuario" autocomplete="username" required>
@@ -107,7 +110,7 @@ window.addEventListener('DOMContentLoaded', () => {
   if (!cargar()) {
     try { DB = generarSemilla(); guardar(); }
     catch (e) { console.error(e); $('#main').innerHTML = `<div class="alert bad"><b>Error al generar los datos de demostración.</b><pre>${esc(e.stack || e.message)}</pre></div>`; return; }
-  }
+  } else migrarDatos();
   $('#brand-logos').outerHTML = logoHTML();
   $('#btn-logout').addEventListener('click', () => { cerrarSesion(); location.hash = ''; mostrarLogin(); });
   $('#btn-reset').addEventListener('click', async () => {

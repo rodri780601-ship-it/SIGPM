@@ -239,7 +239,9 @@ function aplicarImportacion(sol, json) {
     if (ed) { llenar(sol.interesado, r.extra.interesado); llenar(sol.profesional, r.extra.profesional); }
     const p = predio(sol.predioId);
     if (p) {
-      if (r.cursos && !(p.cursos.features || []).length) p.cursos = r.cursos;
+      // Un proyecto aún no toca la ficha predial oficial: los cursos se aplican al enviarlo a CONAF
+      if (r.cursos && sol.esProyecto) sol.cursosPropuestos = r.cursos;
+      else if (r.cursos && !(p.cursos.features || []).length) p.cursos = r.cursos;
       if (!pmfbn.predio.precipitacion) pmfbn.predio.precipitacion = p.precipitacion;
     }
   } else if (!sol.interesado.nombre && pmfbn.interesado.nombre) { sol.interesado.nombre = pmfbn.interesado.nombre; sol.interesado.rut = pmfbn.interesado.rut; }

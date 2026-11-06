@@ -12,7 +12,7 @@ Maqueta funcional (HTML, CSS y JavaScript, sin servidor) para recepcionar, evalu
 
 Requiere conexión a `cdnjs.cloudflare.com` (Leaflet, Turf, proj4) y a `unpkg.com` (lector de shapefile).
 
-## Ingreso de funcionarios (demostración)
+## Ingreso de usuarios (demostración)
 
 Al abrir el sistema aparece la pantalla de ingreso. Todas las cuentas usan la contraseña `demo2026`:
 
@@ -23,6 +23,8 @@ Al abrir el sistema aparece la pantalla de ingreso. Todas las cuentas usan la co
 | Analista | `analista1`, `analista2`, `analista3` | Camila Henríquez · Rodrigo Mansilla · Valentina Oyarzún |
 | Abogado (Unidad Jurídica) | `abogado1`, `abogado2` | Andrés Contreras · Francisca Barrientos |
 | Jefe provincial | `jefe.provincial` | Patricio Saavedra Núñez |
+| Propietario | `propietario1` (2 predios), `propietario2` (1 predio) | Agrícola y Forestal Los Ulmos Ltda. · Juan Carlos Vera Oyarzo |
+| Consultor | `consultor1`, `consultor2` | Ignacio Fuentes · Daniela Riquelme |
 
 El ingreso es solo una simulación: las credenciales están en `js/store.js` y no hay autenticación real. En producción se debe usar la autenticación institucional (por ejemplo, ClaveÚnica o el directorio de CONAF) en un servidor.
 
@@ -48,6 +50,23 @@ Todo se define en `css/tema-institucional.css`. La Aplicación web de plan de ma
 | Revisión | Jefe analista | Recibe ambos informes y verifica que el análisis técnico esté bien hecho. Puede devolverlo al analista o al abogado, o enviar el proyecto de resolución. |
 | Firma | Jefe provincial | Revisa el proyecto de resolución (aprueba, aprueba parcialmente o rechaza) y lo firma o lo devuelve. |
 | Notificación | Secretaría técnica | Registra la carta certificada (10 días hábiles, art. 6° D.S. 93). El plan aprobado queda en la ficha predial y en el registro público (art. 29 D.S. 93). |
+
+## Portal externo: propietarios y consultores
+
+Antes de la recepción, un plan puede nacer fuera de CONAF:
+
+1. **Ticket.** El propietario crea un ticket desde la ficha predial: elige al consultor y la fecha límite. Se genera un código `TK-XXXX-XXXX` que solo sirve para ese consultor y esa ficha.
+2. **Acceso.** El consultor ingresa el código en *Mi bandeja* y accede a la ficha predial mientras el ticket esté vigente.
+3. **Proyecto.** Desde la ficha crea el proyecto, que copia los datos del predio, del propietario y del consultor al formulario.
+4. **Congelamiento.** El propietario puede revocar un ticket en cualquier momento. Si el ticket vence o se revoca con el proyecto en elaboración, queda en solo lectura. Se reactiva con un ticket nuevo del propietario para el mismo consultor y predio.
+5. **Revisión.** El consultor envía el proyecto al propietario, que puede devolverlo con observaciones o enviarlo a CONAF.
+6. **Recepción.** Al enviarlo nace la solicitud en estado *En recepción*, en la bandeja de la secretaría técnica. El plazo legal corre desde su ingreso.
+
+En su ficha predial, el propietario tiene dos vistas del historial: **Planes con resolución firmada**, desde donde abre solo la resolución y el formulario, y **Solicitudes en evaluación**, con la línea de tiempo de la etapa, el plazo legal y los requerimientos pendientes, sin acceso a documentos ni informes.
+
+Los proyectos se guardan en `DB.proyectos`, separados de las solicitudes, de modo que CONAF no ve borradores. En la maqueta el envío del código es un correo simulado, visible en la bandeja del consultor, y los permisos se aplican solo en el navegador: en producción deben validarse en el servidor.
+
+Para probarlo: `consultor1` tiene un código por usar del predio Los Ulmos Bajo y un proyecto congelado en Hijuela Cuesta Alerce, que se reactiva con un ticket de `propietario2`.
 
 ## Análisis espacial automático
 
@@ -85,6 +104,7 @@ js/seed.js          datos de demostración (ficticios)
 js/evaluacion.js    verificaciones automáticas, borradores de informes y de la resolución
 js/vistas.js        bandeja, mapa, ficha predial, registro público, normativa
 js/expediente.js    expediente con pestañas y acciones por rol
+js/portal.js        portal de propietarios y consultores: tickets y proyectos
 js/app.js           navegación y arranque
 formulario-pmfbn/   Aplicación web de plan de manejo + js/sigpm-puente.js (integración)
 ejemplos/           archivos para probar la carga de un predio nuevo e importar un formulario

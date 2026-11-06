@@ -174,4 +174,6 @@ const ROLES = {
   AN: 'Analista',
   AB: 'Abogado (Unidad Jurídica)',
   JP: 'Jefe provincial',
+  PR: 'Propietario',
+  CO: 'Consultor',
 };

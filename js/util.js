@@ -38,6 +38,7 @@ function restarHabiles(iso, n) {
   return isoDe(d);
 }
 const corridosEntre = (a, b) => Math.round((fechaDe(b) - fechaDe(a)) / 864e5);
+const sumarDias = (iso, n) => { const d = fechaDe(iso); d.setDate(d.getDate() + n); return isoDe(d); };
 
 /* ---------- RUT ---------- */
 function rutDV(num) { let s = 0, m = 2; for (let n = num; n > 0; n = Math.floor(n / 10)) { s += (n % 10) * m; m = m === 7 ? 2 : m + 1; } const r = 11 - (s % 11); return r === 11 ? '0' : r === 10 ? 'K' : String(r); }

@@ -32,6 +32,8 @@ function bindFilas(el) { $$('tr[data-href]', el).forEach(tr => tr.addEventListen
 
 /* ---------------- Bandeja ---------------- */
 function vistaBandeja(main) {
+  if (USUARIO.rol === 'PR') { vistaBandejaPropietario(main); return; }
+  if (USUARIO.rol === 'CO') { vistaBandejaConsultor(main); return; }
   const pend = pendientesDe(USUARIO).sort((a, b) => ((plazo(a) || {}).quedan ?? 999) - ((plazo(b) || {}).quedan ?? 999));
   const activas = DB.solicitudes.filter(s => !['notificada', 'desistida'].includes(s.estado));
   const porVencer = activas.filter(s => { const p = plazo(s); return p && !s.resolucion && p.quedan <= 15; });
@@ -193,31 +195,37 @@ function vistaMapa(main) {
 function vistaPredio(main, id) {
   const p = predio(id);
   if (!p) { main.innerHTML = '<div class="empty">Predio no encontrado.</div>'; return; }
+  if (!puedeVerPredio(id)) { sinPermiso(main, USUARIO.rol === 'CO' ? 'No tiene un ticket vigente para esta ficha predial. Solicite uno al propietario.' : 'Esta ficha predial no pertenece a su cuenta.'); return; }
+  const esCO = USUARIO.rol === 'CO', esPR = USUARIO.rol === 'PR';
   const sols = DB.solicitudes.filter(s => s.predioId === id).sort((a, b) => (b.fechaIngreso || '9').localeCompare(a.fechaIngreso || '9'));
   const vig = sols.filter(s => s.resolucion && s.resolucion.tipo !== 'rechaza' && s.resolucion.vigenciaHasta >= hoyISO());
   const c = turf.centroid(p.geom).geometry.coordinates, u = toUTM(c[0], c[1]);
   main.innerHTML = `<div class="page-head"><div><div class="eyebrow">Ficha predial</div><h1>${esc(p.nombre)}</h1>
       <p class="muted">${esc(p.comuna)} · Provincia de ${esc(p.provincia)} · Región de ${esc(p.region)} · Rol ${esc(p.rol)}</p></div>
-      <div class="row-btns">${USUARIO.rol === 'ST' ? `<a class="btn" href="#nueva/${p.id}">+ Nueva solicitud para este predio</a>` : ''}<button class="btn ghost" id="exp-predio">Exportar cartografía</button></div></div>
+      <div class="row-btns">${USUARIO.rol === 'ST' ? `<a class="btn" href="#nueva/${p.id}">+ Nueva solicitud para este predio</a>` : ''}${fichaBotonesExternos(p)}<button class="btn ghost" id="exp-predio">Exportar cartografía</button></div></div>
+    ${fichaAvisoConsultor(p)}
     <div class="ficha-grid">
       <section>
         <table class="kv"><tr><th>Superficie SIG</th><td>${fmt(p.supSIG)} ha</td></tr><tr><th>Centroide</th><td>UTM ${u.huso}S · E ${fmt(u.E, 0)} · N ${fmt(u.N, 0)} (WGS 84)</td></tr>
           <tr><th>Inscripción de dominio</th><td>Fojas ${p.cbr.fojas} N° ${p.cbr.numero} del año ${p.cbr.anio}, CBR de ${esc(p.cbr.conservador)}</td></tr>
           <tr><th>Precipitación media</th><td>${fmt(p.precipitacion, 0)} mm/año</td></tr>
           <tr><th>Cursos de agua cartografiados</th><td>${p.cursos.features.length}</td></tr>
-          <tr><th>Planes aprobados vigentes</th><td>${vig.length ? vig.map(s => `<a href="#exp/${s.id}">Res. ${esc(s.resolucion.numero)}</a> (${fmt(s.resolucion.supAprobada)} ha, hasta ${fmtFecha(s.resolucion.vigenciaHasta)})`).join('<br>') : 'Ninguno'}</td></tr></table>
-        <h2>Solicitudes y planes del predio</h2>${tablaSolicitudes(sols, 'El predio no registra solicitudes.')}
+          <tr><th>Planes aprobados vigentes</th><td>${vig.length ? vig.map(s => `${esCO ? `Res. ${esc(s.resolucion.numero)}` : `<a href="#exp/${s.id}">Res. ${esc(s.resolucion.numero)}</a>`} (${fmt(s.resolucion.supAprobada)} ha, hasta ${fmtFecha(s.resolucion.vigenciaHasta)})`).join('<br>') : 'Ninguno'}</td></tr></table>
+        ${esPR ? '' : `<h2>Solicitudes y planes del predio</h2>${esCO ? fichaSolicitudesConsultor(sols) : tablaSolicitudes(sols, 'El predio no registra solicitudes.')}`}
+        ${fichaSeccionesPropietario(p)}
       </section>
       <section><div class="map-box tall"><div id="map-predio" class="map"></div></div>
         <p class="muted small">Se muestran las áreas de todos los planes del predio. Las capas de referencia (áreas protegidas, humedales, glaciares y especies) son ficticias.</p></section>
-    </div>`;
+    </div>
+    ${esPR ? fichaVistasPropietario(sols) : ''}`;
   bindFilas(main);
+  bindFichaExterna(main, sols);
   const { map, ctrl } = nuevoMapa($('#map-predio'));
   dibujarPredio(map, ctrl, p, null);
   sols.forEach(s => {
     if (!s.cartografia) return;
     const col = COLOR_ESTADO[ESTADOS[s.estado].color];
-    const l = L.geoJSON(s.cartografia, { style: { color: col, weight: 2, fillColor: col, fillOpacity: .3 }, onEachFeature: (f, ly) => ly.bindPopup(`<b>${esc(s.id)}</b> · rodal ${esc(f.properties.rodal)}<br>${esc(ESTADOS[s.estado].nombre)}<br><a href="#exp/${s.id}">Abrir expediente</a>`) }).addTo(map);
+    const l = L.geoJSON(s.cartografia, { style: { color: col, weight: 2, fillColor: col, fillOpacity: .3 }, onEachFeature: (f, ly) => ly.bindPopup(`<b>${esc(s.id)}</b> · rodal ${esc(f.properties.rodal)}<br>${esc(ESTADOS[s.estado].nombre)}${puedeVerSolicitud(s) ? `<br><a href="#exp/${s.id}">Abrir expediente</a>` : ''}`) }).addTo(map);
     ctrl.addOverlay(l, `${s.id} (${ESTADOS[s.estado].nombre})`);
   });
   $('#exp-predio').addEventListener('click', () => {
@@ -236,7 +244,7 @@ function vistaRegistro(main) {
     ${aprob.map(s => { const p = predio(s.predioId); const tfs = [...new Set((s.pmfbn.rodales || []).filter(r => (s.resolucion.rodalesAprobados || []).includes(r.numero)).map(r => TIPOS_FORESTALES[r.tipoForestal].nombre))];
       return `<tr><td>${esc(p.region)}</td><td>${esc(p.provincia)}</td><td>${esc(p.comuna)}</td><td>${esc(TIPOS_PLAN[s.tipoPlan].nombre)}</td><td><a href="#predio/${p.id}">${esc(p.nombre)}</a></td><td>${esc(p.rol)}</td>
       <td>Fs. ${p.cbr.fojas} N° ${p.cbr.numero} ${p.cbr.anio}</td><td>${esc(s.interesado.nombre)}</td><td class="num">${fmt(s.resolucion.supAprobada)}</td><td>${esc(tfs.join(', '))}</td>
-      <td>${fmtFecha(s.resolucion.vigenciaHasta)}</td><td><a href="#exp/${s.id}/resolucion">N° ${esc(s.resolucion.numero)}</a> de ${fmtFecha(s.resolucion.fecha)}</td></tr>`; }).join('') || '<tr><td colspan="12" class="empty-row">Sin planes aprobados.</td></tr>'}
+      <td>${fmtFecha(s.resolucion.vigenciaHasta)}</td><td>${puedeVerSolicitud(s) ? `<a href="#exp/${s.id}/resolucion">N° ${esc(s.resolucion.numero)}</a>` : `N° ${esc(s.resolucion.numero)}`} de ${fmtFecha(s.resolucion.fecha)}</td></tr>`; }).join('') || '<tr><td colspan="12" class="empty-row">Sin planes aprobados.</td></tr>'}
     </tbody></table></div>`;
   $('#reg-csv').addEventListener('click', () => {
     const rows = aprob.map(s => { const p = predio(s.predioId); return [p.region, p.provincia, p.comuna, TIPOS_PLAN[s.tipoPlan].nombre, p.nombre, p.rol, `Fs ${p.cbr.fojas} N ${p.cbr.numero} ${p.cbr.anio}`, s.interesado.nombre, String(s.resolucion.supAprobada).replace('.', ','), s.resolucion.vigenciaHasta, s.resolucion.numero]; });

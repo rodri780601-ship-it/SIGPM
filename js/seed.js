@@ -57,27 +57,49 @@ const PREDIOS_SEED = [
   { id: 'P06', nombre: 'LOTE 4 PICHIRROPULLI', rol: '305-22', comuna: 'Paillaco', c: [-40.030, -72.850], ha: 260, n: 5, pp: 1700, tipos: ['RRC', 'SV'] },
   { id: 'P07', nombre: 'FUNDO EL MAITÉN', rol: '78-301', comuna: 'Máfil', c: [-39.670, -72.930], ha: 410, n: 7, pp: 1750, tipos: ['RRC', 'RRC', 'SV'] },
   { id: 'P08', nombre: 'PARCELA 12 MALALHUE', rol: '144-12', comuna: 'Lanco', c: [-39.450, -72.700], ha: 90, n: 4, pp: 1650, tipos: ['RRC'] },
+  { id: 'P09', nombre: 'FUNDO LOS ULMOS BAJO', rol: '231-46', comuna: 'Valdivia', c: [-39.965, -73.020], ha: 240, n: 5, pp: 2050, tipos: ['RRC', 'SV'] },
 ];
+const NOMBRES_ESTERO = ['Los Ulmos', 'El Alerce', 'Santa Elvira', 'Choshuenco', 'Llancahue', 'Pichirropulli', 'El Maitén', 'Malalhue', 'Los Ulmos Bajo'];
 const ESPECIES_TF = {
   RRC: 'Nothofagus obliqua, N. alpina, N. dombeyi', CRT: 'N. dombeyi, N. alpina, Laureliopsis philippiana', SV: 'Eucryphia cordifolia, Drimys winteri, Aextoxicon punctatum',
   LEN: 'Nothofagus pumilio', ALE: 'Fitzroya cupressoides, Nothofagus nitida', ROH: 'N. glauca, N. obliqua', ESC: 'Quillaja saponaria, Lithraea caustica',
 };
 
+function predioSemilla(c, k) {
+  const rnd = mulberry32(1000 + k * 97);
+  const geom = poligonoIrregular(rnd, c.c[0], c.c[1], c.ha);
+  const cursos = turf.featureCollection([
+    cursoQueCruza(rnd, geom, { nombre: 'Estero ' + NOMBRES_ESTERO[k], seccion: k % 3 === 0 ? 'mayor05' : 'entre02y05', permanente: true }),
+  ]);
+  if (k % 2 === 0) cursos.features.push(cursoQueCruza(rnd, turf.transformRotate(geom, 90), { nombre: 'Quebrada sin nombre', seccion: 'menor02', permanente: false }));
+  const cells = celdas(rnd, geom, c.n);
+  return { id: c.id, nombre: c.nombre, rol: c.rol, region: 'Los Ríos', provincia: 'Valdivia', comuna: c.comuna, geom: turf.feature(geom.geometry, {}),
+    supSIG: haDe(geom), precipitacion: c.pp, cursos, celdas: cells.map((g, i) => turf.feature(g.geometry, { rodal: i + 1, tipo: c.tipos[i % c.tipos.length] })),
+    cbr: { fojas: 200 + k * 131, numero: 300 + k * 87, anio: 1998 + k * 2, conservador: c.comuna === 'Corral' ? 'Valdivia' : c.comuna } };
+}
+
+/* Ejemplos del portal externo: un ticket por usar y un proyecto congelado por ticket vencido */
+function semillaExterna() {
+  DB.tickets = []; DB.proyectos = []; DB.seq.tk = 2; DB.seq.pry = 0;
+  const hoy = hoyISO(), ahora = new Date().toISOString();
+  DB.tickets.push({ id: 'T1', codigo: 'TK-ULMS-7K2Q', predioId: 'P09', propietarioId: 'pr1', consultorId: 'co1', vence: sumarDias(hoy, 30), nota: 'Plan de manejo para el rodal norte.', creado: ahora, canjeado: null, proyectoId: null });
+  const t2 = { id: 'T2', codigo: 'TK-VERA-4M9P', predioId: 'P02', propietarioId: 'pr2', consultorId: 'co1', vence: sumarDias(hoy, -5), nota: '', creado: sumarDias(hoy, -35) + 'T09:00:00', canjeado: sumarDias(hoy, -34) + 'T10:00:00', proyectoId: null };
+  DB.tickets.push(t2);
+  const pry = armarProyecto(t2);
+  pry.creada = t2.canjeado;
+  pry.historial.push({ fecha: sumarDias(hoy, -34) + 'T10:05:00', usuario: 'co1', rol: 'CO', accion: 'Proyecto creado con los datos de la ficha predial', detalle: `Ticket ${t2.codigo}, vigente hasta ${fmtFecha(t2.vence)}` });
+  DB.proyectos.push(pry);
+}
+/* Actualiza los datos ya guardados en el navegador sin perder los cambios del usuario */
+function migrarDatos() {
+  PREDIOS_SEED.forEach((c, k) => { if (!predio(c.id)) DB.predios.push(predioSemilla(c, k)); });
+  if (!DB.tickets) { semillaExterna(); guardar(); }
+}
+
 function generarSemilla() {
   const db = { version: 1, seq: { sol: 0, res: 0 }, predios: [], solicitudes: [], ref: {} };
   // ---- Predios ----
-  PREDIOS_SEED.forEach((c, k) => {
-    const rnd = mulberry32(1000 + k * 97);
-    const geom = poligonoIrregular(rnd, c.c[0], c.c[1], c.ha);
-    const cursos = turf.featureCollection([
-      cursoQueCruza(rnd, geom, { nombre: 'Estero ' + ['Los Ulmos', 'El Alerce', 'Santa Elvira', 'Choshuenco', 'Llancahue', 'Pichirropulli', 'El Maitén', 'Malalhue'][k], seccion: k % 3 === 0 ? 'mayor05' : 'entre02y05', permanente: true }),
-    ]);
-    if (k % 2 === 0) cursos.features.push(cursoQueCruza(rnd, turf.transformRotate(geom, 90), { nombre: 'Quebrada sin nombre', seccion: 'menor02', permanente: false }));
-    const cells = celdas(rnd, geom, c.n);
-    db.predios.push({ id: c.id, nombre: c.nombre, rol: c.rol, region: 'Los Ríos', provincia: 'Valdivia', comuna: c.comuna, geom: turf.feature(geom.geometry, {}),
-      supSIG: haDe(geom), precipitacion: c.pp, cursos, celdas: cells.map((g, i) => turf.feature(g.geometry, { rodal: i + 1, tipo: c.tipos[i % c.tipos.length] })),
-      cbr: { fojas: 200 + k * 131, numero: 300 + k * 87, anio: 1998 + k * 2, conservador: c.comuna === 'Corral' ? 'Valdivia' : c.comuna } });
-  });
+  PREDIOS_SEED.forEach((c, k) => db.predios.push(predioSemilla(c, k)));
   const P = id => db.predios.find(p => p.id === id);
   // ---- Capas de referencia (ficticias) ----
   const gl = puntoDesplazado(P('P04').geom, 0.8, 100);
@@ -212,5 +234,6 @@ function generarSemilla() {
     }
   });
   db.seq.sol = solN;
+  semillaExterna();
   return db;
 }
