@@ -43,7 +43,7 @@ async function subirSolicitudJSON(file) {
   sol.origenFormulario = 'externo';
   registrar(sol, 'Solicitud creada en recepción desde archivo JSON', file.name);
   DB.solicitudes.push(sol); guardar();
-  toast(`Solicitud ${sol.id} creada desde ${file.name}${sol.predioId ? '' : ' · seleccione el predio'}`, sol.predioId ? 'ok' : 'warn');
+  toast(`Solicitud ${sol.id} creada desde ${file.name}${sol.predioId ? '' : ' · revise y cree la ficha predial con los datos del formulario'}`, sol.predioId ? 'ok' : 'warn');
   location.hash = `#exp/${sol.id}/ingreso`;
 }
 
@@ -227,7 +227,14 @@ function tabIngreso(el, sol) {
   const ref = sol.fechaIngreso || hoyISO();
   const vig = d => {
     const v = sol.documentos[d.key] || {};
-    if (!d.vence || !v.presentado || !v.fecha) return '';
+    if (!d.vence) return '';
+    // Dominio y personería: la vigencia se cuenta desde la emisión del certificado, que se indica aquí
+    const em = `<label class="small" style="font-weight:600">Emitido el<input ${ed ? '' : 'disabled'} type="date" data-doc="${d.key}" data-f="fecha" value="${esc(v.fecha || '')}" max="${ref}"></label>`;
+    if (!v.presentado) return em;
+    if (!v.fecha) return `${em}<span class="chip warn">Indique la emisión</span>`;
+    return em + vigChip(d, v);
+  };
+  const vigChip = (d, v) => {
     if (d.vence === 'dominio') { const n = habilesEntre(v.fecha, ref); return n <= NORMA.vigenciaDominio ? `<span class="chip ok">${n} d.h.</span>` : `<span class="chip bad">${n} d.h. · vencido</span>`; }
     const n = corridosEntre(v.fecha, ref); return n <= NORMA.vigenciaPersoneria ? `<span class="chip ok">${n} días</span>` : `<span class="chip bad">${n} días · vencido</span>`;
   };
@@ -238,12 +245,7 @@ function tabIngreso(el, sol) {
       <label>Oficina ${inp('oficina', sol.oficina)}</label><label>Fecha de ingreso ${inp('fechaIngreso', sol.fechaIngreso || '', 'date', 'title="Se fija al ingresar"')}</label></div>
       <h3>Predio</h3>
       <div class="fgrid"><label class="span2">Predio de la ficha predial <select ${dis} id="ing-predio"><option value="">— Seleccione —</option>${DB.predios.map(p => `<option value="${p.id}" ${p.id === sol.predioId ? 'selected' : ''}>${esc(p.nombre)} · rol ${esc(p.rol)} · ${esc(p.comuna)}</option>`).join('')}</select></label></div>
-      ${ed ? `<details class="newpred"><summary>El predio no existe: crear ficha predial desde su límite</summary>
-        <div class="fgrid"><label>Nombre<input id="np-nom"></label><label>Rol de avalúo<input id="np-rol"></label><label>Comuna<input id="np-com" value="Valdivia"></label>
-        <label>Precipitación (mm/año)<input id="np-pp" type="number" value="1800"></label>
-        <label class="span2">Límite predial (.zip, .geojson, .kml)<input id="np-file" type="file" accept=".zip,.geojson,.json,.kml"></label>
-        <label class="span2">Sistema de coordenadas ${selSRC('np-src')}</label></div>
-        <div class="row-btns"><button class="btn sm" id="np-go">Crear ficha predial</button></div></details>` : ''}
+      ${ed && !sol.predioId ? fichaDesdeFormularioHTML(sol) : ''}
     </section>
     <section class="card"><h3>Interesado <small class="muted">Art. 22 D.S. 93</small></h3><div class="fgrid">
       <label>Tipo ${sel('interesado.tipo', i.tipo, { natural: 'Persona natural', juridica: 'Persona jurídica' })}</label>
@@ -262,9 +264,9 @@ function tabIngreso(el, sol) {
       <p class="small ${evaluarProfesional(sol).estado === 'cumple' ? 'ok-txt' : 'warn-txt'}">${esc(evaluarProfesional(sol).det)}</p>
     </section></div>
     <section class="card"><h3>Antecedentes acompañados <small class="muted">Arts. 21, 22 y 23 D.S. 93</small></h3>
-      <div class="tbl-wrap"><table class="grid"><thead><tr><th>Presentado</th><th>Documento</th><th>Fuente</th><th>Fecha de emisión</th><th>Vigencia al ingreso</th><th>Observación</th></tr></thead><tbody>
+      <div class="tbl-wrap"><table class="grid"><thead><tr><th>Presentado</th><th>Documento</th><th>Fuente</th><th>Fecha de recepción</th><th>Vigencia al ingreso</th><th>Observación</th></tr></thead><tbody>
       ${docs.map(d => { const v = sol.documentos[d.key] || {}; return `<tr><td class="center"><input ${dis} type="checkbox" data-doc="${d.key}" data-f="presentado" ${v.presentado ? 'checked' : ''} aria-label="${esc(d.nombre)} presentado"></td>
-        <td>${esc(d.nombre)}</td><td class="small muted">${esc(d.art)}</td><td><input ${dis} type="date" data-doc="${d.key}" data-f="fecha" value="${esc(v.fecha || '')}"></td><td>${vig(d)}</td>
+        <td>${esc(d.nombre)}</td><td class="small muted">${esc(d.art)}</td><td><input ${dis} type="date" data-doc="${d.key}" data-f="${campoRecepcion(d.key)}" value="${esc(v[campoRecepcion(d.key)] || '')}" aria-label="Fecha de recepción: ${esc(d.nombre)}"></td><td>${vig(d)}</td>
         <td><input ${dis} data-doc="${d.key}" data-f="obs" value="${esc(v.obs || '')}"></td></tr>`; }).join('')}</tbody></table></div>
       ${sol.requerimientos.length ? `<h3>Requerimientos al interesado (art. 31 Ley 19.880)</h3><ul class="list">${sol.requerimientos.map(r => `<li>${fmtFecha(r.fecha)} · plazo ${fmtFecha(r.plazo)} · ${r.fechaRespuesta ? `<span class="chip ok">Subsanado ${fmtFecha(r.fechaRespuesta)}</span>` : (hoyISO() > r.plazo ? '<span class="chip bad">Plazo vencido</span>' : '<span class="chip warn">En plazo</span>')}<br>${esc(r.detalle)}</li>`).join('')}</ul>` : ''}
     </section>`;
@@ -278,7 +280,11 @@ function tabIngreso(el, sol) {
   }));
   $$('[data-doc]', el).forEach(x => x.addEventListener('change', () => {
     const d = sol.documentos[x.dataset.doc] = sol.documentos[x.dataset.doc] || {};
-    d[x.dataset.f] = x.type === 'checkbox' ? x.checked : x.value; guardar(); if (x.dataset.f !== 'obs') rerender();
+    d[x.dataset.f] = x.type === 'checkbox' ? x.checked : x.value;
+    // Al marcarlo como presentado, registra la fecha de recepción (editable): la de ingreso de la solicitud o, si aún no ingresa, hoy
+    const fr = campoRecepcion(x.dataset.doc);
+    if (x.dataset.f === 'presentado' && x.checked && !d[fr]) d[fr] = sol.fechaIngreso || hoyISO();
+    guardar(); if (x.dataset.f !== 'obs') rerender();
   }));
   $('#ing-predio').addEventListener('change', e => {
     sol.predioId = e.target.value || null;
@@ -286,18 +292,68 @@ function tabIngreso(el, sol) {
     if (p) sol.pmfbn.predio = { ...sol.pmfbn.predio, nombre: p.nombre, rol: p.rol, comuna: p.comuna, superficieTotal: p.supSIG, precipitacion: p.precipitacion };
     guardar(); rerender();
   });
-  $('#np-go').addEventListener('click', async () => {
-    const f = $('#np-file').files[0], nom = $('#np-nom').value.trim(), rol = $('#np-rol').value.trim();
-    if (!f || !nom || !rol) { toast('Indique nombre, rol y archivo del límite predial', 'warn'); return; }
+  if ($('#np-go')) bindFichaDesdeFormulario(el, sol);
+}
+
+/* Campo de la fecha de recepción de cada antecedente. En dominio y personería, `fecha` guarda la emisión
+   del certificado (base de su vigencia, arts. 22 d) y 23 b) D.S. 93) y la recepción va aparte. */
+const campoRecepcion = key => (DOCUMENTOS.find(d => d.key === key) || {}).vence ? 'recepcion' : 'fecha';
+
+/* ---------- Ficha predial nueva, completada con el formulario entregado ---------- */
+function fichaDesdeFormularioHTML(sol) {
+  const fp = predioDelFormulario(sol);
+  const ex = fp && predioPorRol(fp.roles);
+  const cbr = (fp && fp.cbr) || {};
+  const v = x => esc(x ?? '');
+  const difSup = fp && fp.limite && fp.superficieTotal ? (haDe(fp.limite) - fp.superficieTotal) / fp.superficieTotal * 100 : null;
+  return `${ex ? `<div class="alert warn">El rol ${esc(ex.rol)} del formulario ya tiene ficha predial: <b>${esc(ex.nombre)}</b> (${esc(ex.comuna)}). <button class="btn sm" id="np-asociar" data-p="${ex.id}" type="button">Usar esa ficha</button></div>` : ''}
+    <details class="newpred" ${fp && !ex ? 'open' : ''}><summary>El predio no existe: crear ficha predial</summary>
+      ${fp ? `<p class="hint"><span class="chip ok">Datos del formulario entregado</span> Revise y corrija lo que haga falta antes de crear la ficha.</p>`
+        : '<p class="hint">Si carga el formulario en la pestaña «Formulario PMFBN», estos datos se completan solos.</p>'}
+      <div class="fgrid"><label class="span2">Nombre<input id="np-nom" value="${v(fp && fp.nombre)}"></label>
+      <label>Rol de avalúo<input id="np-rol" value="${v(fp && fp.rol)}"></label>
+      <label>Comuna<input id="np-com" list="np-comunas" value="${v(fp ? fp.comuna : 'Valdivia')}"><datalist id="np-comunas">${Object.keys(PROVINCIA_DE_COMUNA).map(c => `<option value="${esc(c)}">`).join('')}</datalist></label>
+      <label>Precipitación (mm/año)<input id="np-pp" type="number" min="0" value="${v(fp && fp.precipitacion ? fp.precipitacion : 1800)}">${fp && !fp.precipitacion ? '<small class="warn-txt">No viene en el formulario: valor referencial</small>' : ''}</label>
+      <label>Superficie total declarada (ha)<input value="${fp && fp.superficieTotal ? fmt(fp.superficieTotal) : '—'}" disabled></label>
+      <label>Inscrito a fojas<input id="np-fojas" value="${v(cbr.fojas)}"></label><label>N°<input id="np-num" value="${v(cbr.numero)}"></label>
+      <label>Año<input id="np-anio" value="${v(cbr.anio)}"></label><label>Conservador de Bienes Raíces de<input id="np-cbr" value="${v(cbr.conservador)}"></label>
+      ${fp && fp.limite ? `<div class="span2 alert ok" style="margin:0">Límite predial del formulario: <b>${fmt(haDe(fp.limite))} ha</b> SIG${difSup != null && Math.abs(difSup) > 5 ? ` <span class="warn-txt">(difiere ${fmt(difSup, 1)} % de la superficie declarada)</span>` : ''}${fp.cursos ? ` · ${fp.cursos.features.length} curso(s) de agua` : ''}.</div>` : ''}
+      <label class="span2">${fp && fp.limite ? 'Reemplazar el límite con un archivo (opcional)' : 'Límite predial (.zip, .geojson, .kml)'}<input id="np-file" type="file" accept=".zip,.geojson,.json,.kml"></label>
+      <label class="span2">Sistema de coordenadas ${selSRC('np-src')}</label></div>
+      <div class="row-btns"><button class="btn sm" id="np-go" type="button">Crear ficha predial</button></div></details>`;
+}
+function bindFichaDesdeFormulario(el, sol) {
+  const asoc = $('#np-asociar', el);
+  if (asoc) asoc.addEventListener('click', () => {
+    const p = predio(asoc.dataset.p); if (!p) return;
+    sol.predioId = p.id;
+    sol.pmfbn.predio = { ...sol.pmfbn.predio, nombre: sol.pmfbn.predio.nombre || p.nombre, rol: sol.pmfbn.predio.rol || p.rol, comuna: sol.pmfbn.predio.comuna || p.comuna, precipitacion: sol.pmfbn.predio.precipitacion || p.precipitacion };
+    registrar(sol, 'Predio asociado según el rol del formulario', `${p.nombre} · rol ${p.rol}`); guardar();
+    toast(`Solicitud asociada a ${p.nombre}`, 'ok'); rerender();
+  });
+  $('#np-go', el).addEventListener('click', async () => {
+    const fp = predioDelFormulario(sol);
+    const f = $('#np-file').files[0], nom = $('#np-nom').value.trim(), rol = $('#np-rol').value.trim(), comuna = comunaOficial($('#np-com').value);
+    if (!nom || !rol || !comuna) { toast('Indique nombre, rol y comuna del predio', 'warn'); return; }
+    const roles = rol.split(/[,;]/).map(s => s.trim()).filter(Boolean), ex = predioPorRol(roles);
+    if (ex) { toast(`El rol ${ex.rol} ya tiene ficha predial (${ex.nombre}): selecciónela en la lista`, 'warn'); return; }
+    if (!f && !(fp && fp.limite)) { toast('Adjunte el archivo con el límite predial: el formulario no lo trae', 'warn'); return; }
     try {
-      const { fc } = await cargarCapa(f, $('#np-src').value, 'poligono');
-      let g = fc.features[0]; for (let k = 1; k < fc.features.length; k++) g = turf.union(g, fc.features[k]) || g;
+      let geom;
+      if (f) {
+        const { fc } = await cargarCapa(f, $('#np-src').value, 'poligono');
+        let g = fc.features[0]; for (let k = 1; k < fc.features.length; k++) g = turf.union(g, fc.features[k]) || g;
+        geom = g.geometry;
+      } else geom = fp.limite.geometry;
+      const val = id => $(id).value.trim() || '—';
       const id = 'P' + String(DB.predios.length + 1).padStart(2, '0') + uid().slice(0, 3);
-      const np = { id, nombre: nom.toUpperCase(), rol, region: 'Los Ríos', provincia: 'Valdivia', comuna: $('#np-com').value.trim(), geom: turf.feature(g.geometry, {}), supSIG: haDe(g),
-        precipitacion: +$('#np-pp').value || 0, cursos: turf.featureCollection([]), celdas: [], cbr: { fojas: '—', numero: '—', anio: '—', conservador: '—' } };
+      const g = turf.feature(geom, {});
+      const np = { id, nombre: nom.toUpperCase(), rol: roles.join(', '), region: 'Los Ríos', provincia: provinciaDe(comuna), comuna, geom: g, supSIG: haDe(g),
+        precipitacion: +$('#np-pp').value || 0, cursos: (fp && fp.cursos) ? JSON.parse(JSON.stringify(fp.cursos)) : turf.featureCollection([]), celdas: [],
+        cbr: { fojas: val('#np-fojas'), numero: val('#np-num'), anio: val('#np-anio'), conservador: val('#np-cbr') } };
       DB.predios.push(np); sol.predioId = id;
-      sol.pmfbn.predio = { nombre: np.nombre, rol, comuna: np.comuna, superficieTotal: np.supSIG, precipitacion: np.precipitacion };
-      registrar(sol, 'Ficha predial creada', `${np.nombre}, ${fmt(np.supSIG)} ha SIG`); guardar();
+      sol.pmfbn.predio = { ...sol.pmfbn.predio, nombre: np.nombre, rol: np.rol, comuna: np.comuna, superficieTotal: sol.pmfbn.predio.superficieTotal || np.supSIG, precipitacion: np.precipitacion };
+      registrar(sol, 'Ficha predial creada', `${np.nombre}, ${fmt(np.supSIG)} ha SIG · límite ${f ? `del archivo ${f.name}` : 'del formulario entregado'}${np.cursos.features.length ? ` · ${np.cursos.features.length} curso(s) de agua` : ''}`); guardar();
       toast(`Ficha predial creada: ${fmt(np.supSIG)} ha`, 'ok'); rerender();
     } catch (e) { toast(e.message, 'error'); }
   });
@@ -455,7 +511,7 @@ function tabJuridico(el, sol) {
       <div class="tbl-wrap"><table class="grid pauta"><thead><tr><th>Código</th><th>Requisito</th><th>Antecedente</th><th>Verificación automática</th><th>Evaluación</th><th>Observación</th></tr></thead><tbody>
       ${PAUTA_JURIDICA.map(c => { const au = a[c.id]; const v = j.checks[c.id] || {}; const doc = c.doc ? (sol.documentos[c.doc] || {}) : null;
         return `<tr><td><b>${c.id}</b></td><td>${esc(c.txt)}<div class="muted small">${esc(c.art)}</div></td>
-        <td class="small">${doc ? (doc.presentado ? `<span class="chip ok">Acompañado</span> ${fmtFecha(doc.fecha)}` : '<span class="chip bad">No acompañado</span>') : '<span class="muted">—</span>'}</td>
+        <td class="small">${doc ? (doc.presentado ? `<span class="chip ok">Acompañado</span> ${(DOCUMENTOS.find(x => x.key === c.doc) || {}).vence ? `emitido el ${fmtFecha(doc.fecha)}${doc.recepcion ? ` · recibido el ${fmtFecha(doc.recepcion)}` : ''}` : `recibido el ${fmtFecha(doc.fecha)}`}` : '<span class="chip bad">No acompañado</span>') : '<span class="muted">—</span>'}</td>
         <td class="small">${au ? `<span class="chip ${au.estado === 'cumple' ? 'ok' : au.estado === 'na' ? '' : au.estado === 'observacion' ? 'warn' : 'bad'}">${ESTADO_CHECK[au.estado]}</span> ${esc(au.det)}` : '<span class="muted">Revisión del abogado</span>'}</td>
         <td>${selEstado(c.id, v.estado, dis)}</td><td><input ${dis} data-obs="${c.id}" value="${esc(v.obs || '')}" aria-label="Observación ${c.id}"></td></tr>`; }).join('')}</tbody></table></div></section>
     <section class="card"><h3>Conclusión e informe jurídico</h3><div class="fgrid"><label class="span2">Conclusión<select ${dis} data-jur="conclusion"><option value="">— Seleccione —</option>${Object.entries(CONCLUSION_JUR).map(([k, v]) => `<option value="${k}" ${k === j.conclusion ? 'selected' : ''}>${v}</option>`).join('')}</select></label></div>

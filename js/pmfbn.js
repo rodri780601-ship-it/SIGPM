@@ -62,8 +62,36 @@ function normalizarPMFBN(j) {
   Object.assign(out.proteccion, src.proteccion || src.medidasProteccion || {});
   Object.assign(out.firmas, src.firmas || {});
   const carto = src.cartografia || j.cartografia;
-  return { pmfbn: out, cartografia: carto && carto.type === 'FeatureCollection' ? carto : null };
+  const ins = pr.inscripcion || pr.cbr || {};
+  const cbr = { fojas: String(pick(ins, 'fojas') ?? ''), numero: String(pick(ins, 'numero', 'num', 'n') ?? ''), anio: String(pick(ins, 'anio', 'año') ?? ''), conservador: pick(ins, 'conservador', 'cbr') || '' };
+  return { pmfbn: out, cartografia: carto && carto.type === 'FeatureCollection' ? carto : null,
+    limite: limiteDe(pick(pr, 'limite', 'limitePredial', 'geometria') || src.limitePredial || j.limitePredial), extra: { cbr } };
 }
+/* Une los polígonos de un límite predial (Feature, FeatureCollection o geometría en WGS 84). Devuelve un Feature o null. */
+function limiteDe(x) {
+  if (!x || typeof x !== 'object') return null;
+  const feats = x.type === 'FeatureCollection' ? x.features : x.type === 'Feature' ? [x] : x.type ? [{ type: 'Feature', properties: {}, geometry: x }] : [];
+  const pol = feats.filter(f => f && f.geometry && /Polygon/.test(f.geometry.type)).map(f => turf.feature(f.geometry, {}));
+  if (!pol.length || esProyectado(turf.featureCollection(pol))) return null;
+  let g = pol[0];
+  for (let k = 1; k < pol.length; k++) { try { g = turf.union(g, pol[k]) || g; } catch (e) { /* geometría inválida: se conserva lo unido */ } }
+  return turf.feature(g.geometry, {});
+}
+/* Datos de la ficha predial según el formulario entregado (JSON o proyecto de la aplicación) */
+function predioDelFormulario(sol) {
+  const pp = (sol.pmfbn || {}).predio || {};
+  let fp = sol.formularioPredio;
+  if (!fp && sol.pmfbnProyecto) { try { const r = desdeAppPMFBN(sol.pmfbnProyecto); fp = { limite: limiteDe(r.limite), cbr: r.extra.cbr, cursos: r.cursos }; } catch (e) { fp = null; } }
+  fp = fp || {};
+  const lista = s => String(s || '').split(/[,;]/).map(x => x.trim()).filter(Boolean);
+  const roles = lista(pp.rol), comunas = lista(pp.comuna);
+  if (!pp.nombre && !roles.length && !fp.limite) return null;
+  const cbr = fp.cbr && Object.values(fp.cbr).some(v => String(v || '').trim()) ? fp.cbr : null;
+  return { nombre: pp.nombre || '', roles, rol: roles.join(', '), comunas, comuna: comunaOficial(comunas[0] || ''), superficieTotal: +pp.superficieTotal || 0,
+    precipitacion: +pp.precipitacion || 0, cbr, limite: fp.limite || null, cursos: fp.cursos && (fp.cursos.features || []).length ? fp.cursos : null };
+}
+/* Ficha predial existente que coincide con algún rol del formulario */
+const predioPorRol = roles => DB.predios.find(q => roles.some(r => norm(r) === norm(q.rol))) || null;
 
 
 /* ---------- Proyecto de la «Aplicación web de plan de manejo» → esquema SIGPM ---------- */
@@ -232,6 +260,7 @@ function aplicarImportacion(sol, json) {
   const r = normalizarPMFBN(json);
   const { pmfbn, cartografia } = r;
   sol.pmfbn = pmfbn; sol.origenFormulario = 'externo';
+  sol.formularioPredio = { limite: limiteDe(r.limite), cbr: (r.extra || {}).cbr || null, cursos: r.cursos || null };
   if (r.proyecto) {
     sol.pmfbnProyecto = r.proyecto; sol.pmfbnRevision = r.revision;
     const ed = typeof puedeEditar === 'function' && puedeEditar(sol, 'ingreso');

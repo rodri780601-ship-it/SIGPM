@@ -10,7 +10,14 @@
   "rol": "402-55",
   "comuna": "Paillaco",
   "superficieTotal": 132,
-  "precipitacion": 1900
+  "precipitacion": 1900,
+  "inscripcion": {
+   "fojas": "512",
+   "numero": "433",
+   "anio": "2004",
+   "conservador": "Valdivia"
+  },
+  "limite": {"type": "Polygon", "coordinates": [[[-72.957, -40.105], [-72.943, -40.1044], [-72.9422, -40.098], [-72.943, -40.095], [-72.955, -40.0946], [-72.9578, -40.099], [-72.957, -40.105]]]}
  },
  "objetivo": {
   "general": "produccion_maderera",

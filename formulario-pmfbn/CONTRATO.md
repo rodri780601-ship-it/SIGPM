@@ -38,6 +38,13 @@ También se puede importar en SIGPM el archivo `.json` que genera «Exportar pro
 | `f.f14_fecha` + interesado/autor | Firmas |
 | `carto.layers.Rodales` (`N_Rodal`) | Cartografía del área a intervenir |
 | `carto.layers.Hidrografia` | Cursos de agua de la ficha predial (si no tiene) |
+| `carto.layers.Limite_Predial` | Límite de la ficha predial nueva, cuando el predio aún no existe en SIGPM |
+
+## Ficha predial nueva desde el formulario
+
+Si la solicitud no tiene predio, la pestaña *Ingreso y antecedentes* precarga la ficha predial con los datos del formulario: nombre (`f.pr_nombre`), rol(es) y comuna (`t.sol_rol`), inscripción en el CBR (`f.pr_fojas`, `f.pr_num`, `f.pr_anio`, `f.pr_cbr`), límite (`Limite_Predial`) e hidrografía. Si algún rol ya tiene ficha, propone usarla en lugar de crear otra.
+
+El JSON simplificado acepta los mismos datos en `predio`: `nombre`, `rol` (varios separados por coma), `comuna`, `superficieTotal`, `precipitacion`, `inscripcion: { fojas, numero, anio, conservador }` y `limite` (geometría, Feature o FeatureCollection en WGS 84). Un límite en coordenadas proyectadas se ignora y se pide el archivo.
 
 ## Actualizar la aplicación
 

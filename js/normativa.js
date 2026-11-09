@@ -168,6 +168,11 @@ const ESTADOS = {
 };
 const PASOS = ['Recepción', 'Asignación', 'Evaluación', 'Revisión', 'Firma', 'Notificación'];
 
+/* Provincia de cada comuna de la Región de Los Ríos */
+const PROVINCIA_DE_COMUNA = { Valdivia: 'Valdivia', Corral: 'Valdivia', Lanco: 'Valdivia', 'Los Lagos': 'Valdivia', 'Máfil': 'Valdivia', Mariquina: 'Valdivia', Paillaco: 'Valdivia', Panguipulli: 'Valdivia', 'La Unión': 'Ranco', Futrono: 'Ranco', 'Lago Ranco': 'Ranco', 'Río Bueno': 'Ranco' };
+const provinciaDe = comuna => { const k = Object.keys(PROVINCIA_DE_COMUNA).find(c => norm(c) === norm(comuna)); return k ? PROVINCIA_DE_COMUNA[k] : 'Valdivia'; };
+const comunaOficial = comuna => Object.keys(PROVINCIA_DE_COMUNA).find(c => norm(c) === norm(comuna)) || String(comuna || '').trim();
+
 const ROLES = {
   ST: 'Secretaría técnica',
   JA: 'Jefe analista',

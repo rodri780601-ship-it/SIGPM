@@ -116,7 +116,7 @@ ejemplos/           archivos para probar la carga de un predio nuevo e importar 
 
 ## Para probar la carga
 
-1. Como secretaría técnica, abra **Nueva solicitud** → *Ingreso y antecedentes* → «crear ficha predial desde su límite» con `ejemplos/nuevo_predio_limite_WGS84.geojson`.
+1. Como secretaría técnica, use **⬆ Subir solicitud (.json)** con `ejemplos/pmfbn_ejemplo_las_vertientes.json`, o abra **Nueva solicitud** e importe ese archivo en *Formulario PMFBN*. En *Ingreso y antecedentes*, la ficha predial nueva aparece completada con los datos del formulario: nombre, rol, comuna, precipitación, inscripción en el CBR y límite predial. Revísela y presione «Crear ficha predial». Si el formulario no trae el límite, adjunte `ejemplos/nuevo_predio_limite_WGS84.geojson`.
 2. En *Cartografía y análisis*, cargue `ejemplos/nuevo_predio_rodales_UTM18S.geojson`. Está en UTM 18S y el sistema la reproyecta. Agregue también `nuevo_predio_cursos_agua_WGS84.geojson`.
 3. En *Formulario PMFBN*, abra la Aplicación web de plan de manejo, complete el plan y presione «Enviar a SIGPM». También puede importar `ejemplos/pmfbn_ejemplo_las_vertientes.json`, que viene en formato simplificado.
 

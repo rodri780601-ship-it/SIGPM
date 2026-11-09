@@ -155,7 +155,7 @@ function generarSemilla() {
     // Documentos
     documentosRequeridos(sol).forEach(d => {
       const f = d.vence === 'dominio' ? restarHabiles(cfg.ingreso, 40) : d.vence === 'personeria' ? isoDe(new Date(fechaDe(cfg.ingreso).getTime() - 20 * 864e5)) : cfg.ingreso;
-      sol.documentos[d.key] = { presentado: !(cfg.faltan || []).includes(d.key), fecha: f, obs: '' };
+      sol.documentos[d.key] = { presentado: !(cfg.faltan || []).includes(d.key), fecha: f, obs: '', ...(d.vence ? { recepcion: cfg.ingreso } : {}) };
     });
     if (cfg.domVencido) sol.documentos.dominio.fecha = restarHabiles(cfg.ingreso, 160);
     const H = (iso, u, accion, det = '') => sol.historial.push({ fecha: iso + 'T10:' + pad(10 + sol.historial.length) + ':00', usuario: u, rol: usuario(u).rol, accion, detalle: det });
