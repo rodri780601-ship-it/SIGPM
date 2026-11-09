@@ -92,8 +92,59 @@ function semillaExterna() {
 }
 /* Actualiza los datos ya guardados en el navegador sin perder los cambios del usuario */
 function migrarDatos() {
+  if (DB.sinEjemplos) { DB.tickets = DB.tickets || []; DB.proyectos = DB.proyectos || []; return; } // el usuario borró los ejemplos: no se reponen
   PREDIOS_SEED.forEach((c, k) => { if (!predio(c.id)) DB.predios.push(predioSemilla(c, k)); });
   if (!DB.tickets) { semillaExterna(); guardar(); }
+}
+
+/* ---------- Datos de ejemplo: borrar y cargar (solo para pruebas del sistema) ----------
+   Son de ejemplo los predios de PREDIOS_SEED y todo lo que cuelga de ellos (solicitudes, tickets y proyectos),
+   además de las capas de referencia ficticias. Lo creado en predios propios se conserva. */
+const PREDIOS_EJEMPLO = new Set(PREDIOS_SEED.map(c => c.id));
+const capasVacias = () => ({ snaspe: turf.featureCollection([]), humedales: turf.featureCollection([]), glaciares: turf.featureCollection([]), especies: turf.featureCollection([]) });
+/* Separa lo propio del usuario de lo de ejemplo */
+function datosPropios(db) {
+  const predios = db.predios.filter(p => !PREDIOS_EJEMPLO.has(p.id));
+  const ok = x => !x.predioId || !PREDIOS_EJEMPLO.has(x.predioId);
+  return { predios, solicitudes: db.solicitudes.filter(ok), tickets: (db.tickets || []).filter(ok), proyectos: (db.proyectos || []).filter(ok) };
+}
+function resumenDatos(db = DB) {
+  const n = k => (db[k] || []).length, pr = datosPropios(db);
+  return { predios: n('predios'), solicitudes: n('solicitudes'), proyectos: n('proyectos'), tickets: n('tickets'),
+    ejemplos: db.predios.filter(p => PREDIOS_EJEMPLO.has(p.id)).length, propios: pr.predios.length + pr.solicitudes.length + pr.proyectos.length + pr.tickets.length };
+}
+function borrarEjemplos() {
+  const pr = datosPropios(DB);
+  Object.assign(DB, pr, { ref: capasVacias(), sinEjemplos: true });
+  guardar();
+}
+/* Carga los ejemplos y conserva lo propio; si algún N° de lo propio coincide con uno de ejemplo, lo propio se renumera */
+function cargarEjemplos() {
+  const pr = JSON.parse(JSON.stringify(datosPropios(DB)));
+  const seqAntes = { ...(DB.seq || {}) };
+  const db = generarSemilla(); // deja DB = db con los ejemplos
+  const seq = (k, ids, patron) => Math.max(db.seq[k] || 0, seqAntes[k] || 0, ...ids.map(id => +(String(id).match(patron) || [0, 0])[1]));
+  const renumerar = (lista, existentes, nuevoId) => {
+    const mapa = {};
+    lista.forEach(x => { if (existentes.has(x.id)) { const n = nuevoId(); mapa[x.id] = n; x.id = n; } existentes.add(x.id); });
+    return mapa;
+  };
+  const y = new Date().getFullYear();
+  db.seq.sol = seq('sol', [...db.solicitudes, ...pr.solicitudes].map(s => s.id), /-(\d+)$/);
+  db.seq.pry = seq('pry', [...db.proyectos, ...pr.proyectos].map(s => s.id), /-(\d+)$/);
+  db.seq.tk = seq('tk', [...db.tickets, ...pr.tickets].map(s => s.id), /^T(\d+)$/);
+  db.seq.res = Math.max(db.seq.res || 0, seqAntes.res || 0);
+  const mSol = renumerar(pr.solicitudes, new Set(db.solicitudes.map(s => s.id)), () => `PM-${y}-${String(++db.seq.sol).padStart(4, '0')}`);
+  const mPry = renumerar(pr.proyectos, new Set(db.proyectos.map(s => s.id)), () => `PRY-${y}-${String(++db.seq.pry).padStart(4, '0')}`);
+  const mTk = renumerar(pr.tickets, new Set(db.tickets.map(s => s.id)), () => `T${++db.seq.tk}`);
+  const m = (mapa, id) => (id && mapa[id]) || id;
+  pr.proyectos.forEach(x => { x.solicitudId = m(mSol, x.solicitudId); x.ticketId = m(mTk, x.ticketId); });
+  pr.tickets.forEach(x => { x.proyectoId = m(mPry, x.proyectoId); });
+  pr.solicitudes.forEach(x => { if (x.origenProyecto) x.origenProyecto.proyectoId = m(mPry, x.origenProyecto.proyectoId); });
+  db.predios.push(...pr.predios); db.solicitudes.push(...pr.solicitudes); db.proyectos.push(...pr.proyectos); db.tickets.push(...pr.tickets);
+  delete db.sinEjemplos;
+  DB = db; guardar();
+  return { renumeradas: Object.keys(mSol).length + Object.keys(mPry).length + Object.keys(mTk).length };
 }
 
 function generarSemilla() {

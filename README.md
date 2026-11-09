@@ -26,6 +26,8 @@ Al abrir el sistema aparece la pantalla de ingreso. Todas las cuentas usan la co
 | Propietario | `propietario1` (2 predios), `propietario2` (1 predio) | Agrícola y Forestal Los Ulmos Ltda. · Juan Carlos Vera Oyarzo |
 | Consultor | `consultor1`, `consultor2` | Ignacio Fuentes · Daniela Riquelme |
 
+En la portada, el recuadro **Datos de ejemplo** (solo para pruebas del sistema) permite **borrar** los ejemplos para partir con el sistema vacío y **cargarlos** de nuevo. Al borrar se eliminan los 9 predios de ejemplo con sus solicitudes, tickets y proyectos, y las capas de referencia ficticias. Se conservan las fichas creadas por el usuario y lo que dependa de ellas. Al cargar, si un número propio coincide con uno de ejemplo, el propio se renumera.
+
 El ingreso es solo una simulación: las credenciales están en `js/store.js` y no hay autenticación real. En producción se debe usar la autenticación institucional (por ejemplo, ClaveÚnica o el directorio de CONAF) en un servidor.
 
 ## Identidad institucional

@@ -68,6 +68,7 @@ function mostrarLogin(msg) {
         <p class="small" style="margin:0;color:#4d5650">Contraseña de todas las cuentas: <code>demo2026</code>. Haga clic en una cuenta para completar el formulario.</p>
         <div class="demo-grupos">${Object.keys(ROLES).map(r => `<div class="demo-grupo"><div class="demo-gt">${esc(ROLES[r])}</div>${USUARIOS.filter(u => u.rol === r).map(fila).join('')}</div>`).join('')}</div>
       </aside>
+      ${bloqueEjemplosHTML()}
     </div>
     <footer class="lg-pie"><div class="lg-pie-cols">
       <div><img src="img/logo-conaf-gobierno-gris.png" alt="Ministerio de Agricultura, Gobierno de Chile · CONAF"><b>Servicios en Línea</b></div>
@@ -79,6 +80,7 @@ function mostrarLogin(msg) {
     let k = 0; const sl = $$('.lg-slide', L);
     carruselTimer = setInterval(() => { if (L.hidden) { clearInterval(carruselTimer); return; } sl[k].classList.remove('activo'); k = (k + 1) % sl.length; sl[k].classList.add('activo'); }, 6000);
   }
+  bindEjemplos(L);
   $$('.demo-acc', L).forEach(b => b.addEventListener('click', () => { $('#lg-u').value = b.dataset.u; $('#lg-c').value = 'demo2026'; $('#lg-c').focus(); }));
   $('#login-form').addEventListener('submit', e => {
     e.preventDefault();
@@ -88,6 +90,36 @@ function mostrarLogin(msg) {
     entrar();
   });
   $('#lg-u').focus();
+}
+/* ---------- Datos de ejemplo en la portada (solo para pruebas del sistema) ---------- */
+function bloqueEjemplosHTML() {
+  const r = resumenDatos(), todos = r.ejemplos === PREDIOS_SEED.length;
+  const estado = r.ejemplos ? `Cargados: ${r.ejemplos} predios de ejemplo con sus solicitudes, tickets y proyectos.` : 'No hay datos de ejemplo cargados.';
+  return `<aside class="lg-card lg-ejemplos" aria-labelledby="lg-ej-t"><h2 id="lg-ej-t">Datos de ejemplo</h2>
+    <p class="small"><b>Solo para pruebas del sistema.</b> Predios, personas, RUT, solicitudes y capas de referencia ficticios. No los use para tramitar solicitudes reales.</p>
+    <p class="small" id="lg-ej-estado">${esc(estado)}${r.propios ? ` Registros propios en este navegador: ${r.propios} (se conservan).` : ''}</p>
+    <div class="lg-ej-btns"><button type="button" class="btn sm" id="lg-ej-cargar" ${todos ? 'disabled' : ''}>Cargar ejemplos</button>
+      <button type="button" class="btn sm ghost danger" id="lg-ej-borrar" ${r.ejemplos ? '' : 'disabled'}>Borrar ejemplos</button></div></aside>`;
+}
+function bindEjemplos(L) {
+  $('#lg-ej-borrar', L).addEventListener('click', async () => {
+    const r = resumenDatos();
+    const ok = await modal({ titulo: 'Borrar los datos de ejemplo', html: `<p>Se eliminarán de este navegador los ${r.ejemplos} predios de ejemplo, con sus solicitudes, tickets y proyectos, y las capas de referencia ficticias.</p>
+        <p>${r.propios ? `Se conservan sus ${r.propios} registros propios (fichas prediales creadas por usted y lo que dependa de ellas).` : 'No hay registros propios: el sistema quedará vacío.'} Las cuentas de demostración siguen disponibles.</p>
+        <p class="muted small">Puede volver a cargarlos cuando quiera con «Cargar ejemplos».</p>`,
+      botones: [{ txt: 'Cancelar' }, { txt: 'Borrar ejemplos', valor: true, cls: 'danger' }] });
+    if (!ok) return;
+    borrarEjemplos(); mostrarLogin(); toast('Datos de ejemplo borrados', 'ok');
+  });
+  $('#lg-ej-cargar', L).addEventListener('click', async () => {
+    const r = resumenDatos();
+    const ok = await modal({ titulo: 'Cargar los datos de ejemplo', html: `<p>Se cargarán predios, solicitudes en todas las etapas, tickets y proyectos <b>ficticios</b>, solo para probar el sistema.</p>
+        ${r.ejemplos ? '<p>Los ejemplos que ya estaban vuelven a su estado inicial.</p>' : ''}${r.propios ? `<p>Se conservan sus ${r.propios} registros propios. Si alguno tiene el mismo número que un ejemplo, recibe un número nuevo.</p>` : ''}`,
+      botones: [{ txt: 'Cancelar' }, { txt: 'Cargar ejemplos', valor: true }] });
+    if (!ok) return;
+    try { const x = cargarEjemplos(); mostrarLogin(); toast(`Datos de ejemplo cargados${x.renumeradas ? ` · ${x.renumeradas} registro(s) propio(s) renumerado(s)` : ''}`, 'ok'); }
+    catch (e) { console.error(e); toast('No se pudieron cargar los ejemplos: ' + e.message, 'error'); }
+  });
 }
 function entrar() {
   document.body.classList.remove('en-login');
