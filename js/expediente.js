@@ -387,14 +387,43 @@ const selSRC = id => `<select id="${id}"><option value="auto">Detectar (.prj / C
 function tabFormulario(el, sol) {
   const ed = puedeEditar(sol, 'ingreso');
   const f = sol.pmfbn;
-  const faltan = CONTENIDOS_ART14.filter(([, , fn]) => !fn(f, sol));
-  el.innerHTML = `<div class="art14">${CONTENIDOS_ART14.map(([l, t, fn]) => `<span class="chip ${fn(f, sol) ? 'ok' : 'bad'}" title="${esc(t)}">${l}) ${fn(f, sol) ? '✔' : '✖'}</span>`).join('')}
-    <span class="muted small">${faltan.length ? `Contenidos del art. 14 D.S. 93 pendientes: ${faltan.length}` : 'Contiene todos los contenidos del art. 14 D.S. 93'}</span></div>
+  const pintarArt14 = () => {
+    const ff = sol.pmfbn, faltan = CONTENIDOS_ART14.filter(([, , fn]) => !fn(ff, sol));
+    $('#art14-chips').innerHTML = CONTENIDOS_ART14.map(([l, t, fn]) => `<span class="chip ${fn(ff, sol) ? 'ok' : 'bad'}" data-art14="${l}" tabindex="0" aria-label="${esc(l + ') ' + t)}" style="cursor:help">${l}) ${fn(ff, sol) ? '✔' : '✖'}</span>`).join('')
+      + `<span class="muted small">${faltan.length ? `Contenidos del art. 14 D.S. 93 pendientes: ${faltan.length}` : 'Contiene todos los contenidos del art. 14 D.S. 93'} · pase el mouse sobre una letra para ver dónde se completa en el formulario</span>`;
+  };
+  el.innerHTML = `<div class="art14" id="art14-chips"></div>
     <div id="pmf"></div>`;
+  /* Globo flotante: ubicación de cada contenido del art. 14 en el formulario del plan de manejo */
+  const chips = $('#art14-chips');
+  let globo = null;
+  const ocultar = () => { if (globo) { globo.remove(); globo = null; } };
+  const mostrar = b => {
+    ocultar();
+    const c = CONTENIDOS_ART14.find(x => x[0] === b.dataset.art14); if (!c) return;
+    const ok = c[2](sol.pmfbn, sol);
+    globo = document.createElement('div');
+    globo.setAttribute('role', 'tooltip');
+    globo.style.cssText = 'position:fixed;z-index:9999;max-width:340px;padding:10px 12px;border-radius:8px;background:#212529;color:#fff;font-size:13px;line-height:1.4;box-shadow:0 6px 20px rgba(0,0,0,.3);pointer-events:none';
+    globo.innerHTML = `<b>${esc(c[0])}) ${esc(c[1])}</b> <span style="opacity:.8">${ok ? '✔ completo' : '✖ pendiente'}</span><div style="margin-top:4px;opacity:.85">Ubicación en el formulario del plan de manejo:</div>`
+      + `<ul style="margin:4px 0 0;padding-left:18px">${(CAPITULOS_ART14[c[0]] || []).map(([cap, d]) => `<li><b>${esc(cap)}</b> · ${esc(d)}</li>`).join('')}</ul>`;
+    document.body.appendChild(globo);
+    const r = b.getBoundingClientRect(), g = globo.getBoundingClientRect();
+    const x = Math.max(8, Math.min(r.left, window.innerWidth - g.width - 8));
+    const y = r.bottom + 8 + g.height > window.innerHeight ? Math.max(8, r.top - g.height - 8) : r.bottom + 8;
+    globo.style.left = x + 'px'; globo.style.top = y + 'px';
+  };
+  chips.addEventListener('mouseover', e => { const b = e.target.closest('[data-art14]'); if (b) mostrar(b); });
+  chips.addEventListener('mouseout', e => { if (e.target.closest('[data-art14]')) ocultar(); });
+  chips.addEventListener('focusin', e => { const b = e.target.closest('[data-art14]'); if (b) mostrar(b); });
+  chips.addEventListener('focusout', ocultar);
+  window.addEventListener('scroll', ocultar, { passive: true, once: true });
+  window.addEventListener('hashchange', ocultar, { once: true });
+  pintarArt14();
   $('#pmf').innerHTML = renderPMFBN(sol, ed);
   const ver = $('#pm-ver'); if (ver) ver.addEventListener('click', () => abrirFormularioExterno(sol, () => {}, true));
   const dl = $('#pm-dl'); if (dl) dl.addEventListener('click', () => descargar(`PMFBN_${sol.id}.json`, JSON.stringify(sol.pmfbnProyecto), 'application/json'));
-  if (ed) bindPMFBN($('#pmf'), sol, full => { guardar(); if (full) rerender(); else { const ff = CONTENIDOS_ART14.map(([l, t, fn]) => `<span class="chip ${fn(sol.pmfbn, sol) ? 'ok' : 'bad'}" title="${esc(t)}">${l}) ${fn(sol.pmfbn, sol) ? '✔' : '✖'}</span>`).join(''); $('.art14', el).innerHTML = ff; } });
+  if (ed) bindPMFBN($('#pmf'), sol, full => { guardar(); if (full) rerender(); else pintarArt14(); });
 }
 
 /* ---------- Cartografía y análisis ---------- */

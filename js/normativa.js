@@ -121,6 +121,19 @@ const CONTENIDOS_ART14 = [
   ['i', 'Cartografía digital georreferenciada', (f, sol) => !!(sol && sol.cartografia && sol.cartografia.features && sol.cartografia.features.length)],
 ];
 
+/* Dónde se completa cada contenido del art. 14 D.S. 93 en la «Aplicación web de plan de manejo» (capítulos del formulario) */
+const CAPITULOS_ART14 = {
+  a: [['Solicitud, secciones 2 y 3', 'Interesado/a y representante legal'], ['Capítulo 1', 'Antecedentes generales']],
+  b: [['Solicitud, sección 5', 'Predio'], ['Capítulo 1', 'Antecedentes generales'], ['Capítulo 4', 'Diagnóstico predial (4.1 aspectos relevantes del predio y su entorno)']],
+  c: [['Capítulo 5', 'Descripción cualitativa (5.1 rodales, 5.2 hidrografía, 5.3 fisiografía y suelo)'], ['Capítulo 7.2', 'Estado de desarrollo por rodal'], ['Capítulo 12', 'Información cuantitativa del recurso (inventario)']],
+  d: [['Capítulo 6', 'Objetivos de manejo']],
+  e: [['Capítulo 7', 'Tratamiento silvicultural (7.1 bosque futuro, 7.4.1 actividades de corta, 7.4.3 regeneración o reforestación)'], ['Capítulo 8', 'Otras actividades (cuando no hay corta)']],
+  f: [['Capítulo 7.3', 'Calendarización de actividades (7.3.1 inmediatas y 7.3.2 programa según desarrollo del rodal)']],
+  g: [['Capítulo 7', 'Criterios de corta e intervención (7.1, 7.4)'], ['Capítulo 9', 'Actividades de apoyo (caminos forestales)'], ['Capítulo 10', 'Extracción de productos (10.1 método de madereo)']],
+  h: [['Capítulo 11', 'Medidas de protección (biodiversidad, sanidad, incendios, suelos, aguas y humedales, regeneración)'], ['Capítulo 9.2', 'Protección contra incendios forestales']],
+  i: [['Capítulo 13', 'Cartografía']],
+};
+
 /* Métodos de corta / tratamientos (D.S. 93 art. 1° y prácticas del formulario) */
 const METODOS = {
   'corta_seleccion':  { nombre: 'Corta de selección', intermedia: false },
