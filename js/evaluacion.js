@@ -105,17 +105,18 @@ function propuestaDesde(sol) {
   if (sol.tecnico.conclusion === 'rechazar' || sol.juridico.conclusion === 'desfavorable') tipo = 'rechaza';
   const rods = sol.pmfbn.rodales || [];
   const anioFin = Math.max(new Date().getFullYear() + 1, ...rods.map(r => +r.anioCorta || 0), ...rods.map(r => +(r.reforestacion || {}).anio || 0));
-  return { tipo, supAprobada: tipo === 'rechaza' ? 0 : s.supAprobada, supRechazada: tipo === 'rechaza' ? round2(sum(rods, 'superficie')) : s.supRechazada,
-    rodalesAprobados: tipo === 'rechaza' ? [] : s.aprobados, rodalesObjetados: tipo === 'rechaza' ? rods.map(r => r.numero) : s.objetados, vigenciaHasta: `${anioFin}-12-31` };
+  return ajustarPorDifrol(sol, { tipo, supAprobada: tipo === 'rechaza' ? 0 : s.supAprobada, supRechazada: tipo === 'rechaza' ? round2(sum(rods, 'superficie')) : s.supRechazada,
+    rodalesAprobados: tipo === 'rechaza' ? [] : s.aprobados, rodalesObjetados: tipo === 'rechaza' ? rods.map(r => r.numero) : s.objetados, vigenciaHasta: `${anioFin}-12-31` });
 }
 
 function textoResolucion(sol) {
   const p = predio(sol.predioId) || {};
-  const pr = sol.resolucion || sol.revisionJA || propuestaDesde(sol);
+  const pr = ajustarPorDifrol(sol, sol.resolucion || sol.revisionJA || propuestaDesde(sol));
   const num = sol.resolucion ? `N° ${sol.resolucion.numero}` : 'N° ______ (borrador)';
   const fecha = sol.resolucion ? fmtFecha(sol.resolucion.fecha) : fmtFecha(hoyISO());
   const objetados = (pr.rodalesObjetados || []);
-  const mot = objetados.map(n => `rodal ${n}: ${((sol.tecnico.rodales || {})[n] || {}).motivo || 'no se ajusta a los requisitos de la Ley y sus reglamentos'}`).join('; ');
+  const motDifrol = pr.porDifrol || (difrolRechaza(sol) && pr.tipo === 'rechaza') ? 'la Dirección de Fronteras y Límites del Estado (DIFROL) no aprobó la solicitud, por ubicarse el predio en una comuna declarada fronteriza' : '';
+  const mot = motDifrol || objetados.map(n => `rodal ${n}: ${((sol.tecnico.rodales || {})[n] || {}).motivo || 'no se ajusta a los requisitos de la Ley y sus reglamentos'}`).join('; ');
   const jp = sol.resolucion ? usuario(sol.resolucion.firmadaPor).nombre : usuario('jp1').nombre;
   const resuelvo = [];
   if (pr.tipo === 'aprueba' || pr.tipo === 'parcial') {
@@ -134,13 +135,13 @@ function textoResolucion(sol) {
 RESOLUCIÓN ${num}
 Valdivia, ${fecha}
 
-VISTOS: La Ley N° 20.283 sobre Recuperación del Bosque Nativo y Fomento Forestal; el D.S. N° 93 de 2008 del Ministerio de Agricultura, Reglamento General de dicha ley; el D.S. N° 82 de 2010, Reglamento de Suelos, Aguas y Humedales; el D.L. N° 701 de 1974; la Ley N° 19.880; la solicitud ${sol.id} ingresada el ${fmtFecha(sol.fechaIngreso)}; el informe técnico de ${usuario((sol.tecnico || {}).por).nombre} y el informe jurídico de ${usuario((sol.juridico || {}).por).nombre}.
+VISTOS: La Ley N° 20.283 sobre Recuperación del Bosque Nativo y Fomento Forestal; el D.S. N° 93 de 2008 del Ministerio de Agricultura, Reglamento General de dicha ley; el D.S. N° 82 de 2010, Reglamento de Suelos, Aguas y Humedales; el D.L. N° 701 de 1974; la Ley N° 19.880; la solicitud ${sol.id} ingresada el ${fmtFecha(sol.fechaIngreso)};${sol.difrol && sol.difrol.respuesta ? ` la respuesta de la Dirección de Fronteras y Límites de Chile (DIFROL)${sol.difrol.oficio ? `, oficio N° ${sol.difrol.oficio}` : ''}${sol.difrol.fecha ? ` de ${fmtFecha(sol.difrol.fecha)}` : ''}, que ${sol.difrol.respuesta === 'aprueba' ? 'aprueba' : 'rechaza'} la solicitud;` : ''} el informe técnico de ${usuario((sol.tecnico || {}).por).nombre} y el informe jurídico de ${usuario((sol.juridico || {}).por).nombre}.
 
 CONSIDERANDO:
 1. Que el interesado presentó un ${TIPOS_PLAN[sol.tipoPlan].nombre.toLowerCase()} para ${fmt(sum(sol.pmfbn.rodales || [], 'superficie'))} ha, elaborado por ${sol.profesional.nombre}, ${sol.profesional.titulo}.
 2. Que el informe jurídico concluye: ${CONCLUSION_JUR[sol.juridico.conclusion] || '—'}.
 3. Que el informe técnico, revisado por el jefe analista, concluye: ${CONCLUSION_TEC[sol.tecnico.conclusion] || '—'}.
-4. Que la Corporación debe pronunciarse dentro de ${NORMA.plazoResolucion} días hábiles desde el ingreso y sólo puede rechazar un plan que no cumpla los requisitos de la ley (art. 8° Ley 20.283).
+4. Que la Corporación debe pronunciarse dentro de ${NORMA.plazoResolucion} días hábiles desde el ingreso y sólo puede rechazar un plan que no cumpla los requisitos de la ley (art. 8° Ley 20.283).${motDifrol ? '\n5. Que la DIFROL rechazó la solicitud, por lo que, aun existiendo informes favorables, no procede aprobar el plan de manejo.' : ''}
 
 RESUELVO:
 ${resuelvo.map((t, i) => `${i + 1}. ${t}`).join('\n')}

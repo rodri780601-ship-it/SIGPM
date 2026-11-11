@@ -193,14 +193,41 @@ function devolverAJA(sol, obs) {
   registrar(sol, 'Devuelto al jefe analista por el jefe provincial', obs);
   guardar();
 }
+/* ---------- DIFROL: comunas fronterizas ---------- */
+function comunasDeSolicitud(sol) {
+  const p = predio(sol.predioId);
+  const l = [p && p.comuna, ...String((sol.pmfbn && sol.pmfbn.predio && sol.pmfbn.predio.comuna) || '').split(/[,;]/)];
+  return [...new Set(l.map(c => String(c || '').trim()).filter(Boolean))];
+}
+/* Entradas de la nómina oficial DIFROL (total o parcialmente fronterizas) que corresponden a la solicitud */
+const comunasFronterizasDe = sol => comunasDeSolicitud(sol).map(c => COMUNAS_FRONTERIZAS.find(f => norm(f.comuna) === norm(c))).filter(Boolean);
+const textoComunasFronterizas = sol => comunasFronterizasDe(sol).map(f => `${f.comuna}: ${f.tipo === 'total' ? 'totalmente fronteriza' : 'parcialmente fronteriza'}${f.obs ? ` (${f.obs.toLowerCase()})` : ''}`).join('; ');
+const esFronteriza = sol => comunasFronterizasDe(sol).length > 0;
+/* Regla: el jefe provincial no puede resolver mientras la secretaría no registre la respuesta de la DIFROL */
+const difrolPendiente = sol => esFronteriza(sol) && !(sol.difrol && sol.difrol.respuesta);
+/* Regla: si la DIFROL rechaza la solicitud, solo puede emitirse una resolución que rechace el plan de manejo,
+   aunque los informes técnico y jurídico lo aprueben. */
+const difrolRechaza = sol => esFronteriza(sol) && !!sol.difrol && sol.difrol.respuesta === 'rechaza';
+function ajustarPorDifrol(sol, pr) {
+  if (!pr || pr.tipo === 'rechaza' || !difrolRechaza(sol)) return pr;
+  const rods = sol.pmfbn.rodales || [];
+  return { ...pr, tipo: 'rechaza', supAprobada: 0, supRechazada: round2(sum(rods, 'superficie')), rodalesAprobados: [], rodalesObjetados: rods.map(r => r.numero), porDifrol: true };
+}
+function registrarRespuestaDifrol(sol, d) {
+  sol.difrol = { respuesta: d.respuesta, fecha: d.fecha, oficio: d.oficio || '', obs: d.obs || '', por: USUARIO.id };
+  registrar(sol, `Respuesta de la DIFROL registrada: ${d.respuesta === 'aprueba' ? 'APRUEBA' : 'RECHAZA'}`, [d.oficio && `Oficio N° ${d.oficio}`, d.fecha && fmtFecha(d.fecha), d.obs].filter(Boolean).join(' · '));
+  guardar();
+}
+
 function firmarResolucion(sol) {
+  if (difrolPendiente(sol)) throw new Error('Falta registrar la respuesta de la DIFROL (comuna fronteriza).');
   const y = new Date().getFullYear();
   DB.seq.res = (DB.seq.res || 0) + 1;
-  const p = sol.revisionJA;
+  const p = ajustarPorDifrol(sol, sol.revisionJA);
   sol.resolucion = { numero: `${DB.seq.res}/${y}`, fecha: hoyISO(), tipo: p.tipo, supAprobada: p.supAprobada, supRechazada: p.supRechazada,
     rodalesAprobados: p.rodalesAprobados, rodalesObjetados: p.rodalesObjetados, firmadaPor: USUARIO.id, vigenciaHasta: p.vigenciaHasta };
   sol.estado = 'resuelta';
-  registrar(sol, `Resolución N° ${sol.resolucion.numero} firmada`, RESUELVE[p.tipo]);
+  registrar(sol, `Resolución N° ${sol.resolucion.numero} firmada`, RESUELVE[p.tipo] + (p.porDifrol ? ' (por rechazo de la DIFROL)' : ''));
   guardar();
 }
 function notificar(sol, datos) {

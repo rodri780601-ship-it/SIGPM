@@ -66,6 +66,7 @@ function vistaExpediente(main, id, tab) {
         : '<b>Sin ingreso formal</b><span>El plazo legal corre desde el ingreso</span>'}</div>
     </div>
     <ol class="stepper">${PASOS.map((n, i) => `<li class="${sol.estado === 'desistida' ? (i === 0 ? 'bad' : '') : i < paso ? 'done' : i === paso ? 'now' : ''}">${esc(n)}</li>`).join('')}</ol>
+    ${bannerDifrol(sol)}
     <div class="actions" id="acciones"></div>
     <nav class="tabs" role="tablist">${pestanas.map(([k, l]) => `<a role="tab" href="#exp/${sol.id}/${k}" class="${k === tab ? 'on' : ''}" aria-selected="${k === tab}">${esc(l)}${badgeTab(sol, k)}</a>`).join('')}</nav>
     <div id="panel" class="panel"></div>`;
@@ -73,6 +74,18 @@ function vistaExpediente(main, id, tab) {
   const panel = $('#panel');
   ({ resumen: tabResumen, ingreso: tabIngreso, formulario: tabFormulario, cartografia: tabCartografia, tecnico: tabTecnico, juridico: tabJuridico,
     revision: tabRevision, resolucion: tabResolucion, historial: tabHistorial })[tab](panel, sol);
+}
+/* Alerta DIFROL: comuna fronteriza → la solicitud debe enviarse a la DIFROL para su aprobación */
+function bannerDifrol(sol) {
+  if (!esFronteriza(sol) || ['notificada', 'desistida'].includes(sol.estado) && !sol.difrol) return '';
+  const com = textoComunasFronterizas(sol);
+  const d = sol.difrol;
+  if (!d || !d.respuesta) return `<div class="alert bad" id="alerta-difrol"><b>⚠ Comuna fronteriza (${esc(com)}) · DIFROL.</b> Esta solicitud debe enviarse a la Dirección de Fronteras y Límites de Chile (DIFROL) para su aprobación.
+    <b>El jefe provincial no podrá resolver mientras la secretaría técnica no registre la respuesta de la DIFROL.</b>${USUARIO.rol === 'ST' && !sol.resolucion ? ' <button class="btn sm" id="ac-difrol" type="button">Ingresar respuesta DIFROL</button>' : ''}</div>`;
+  const ap = d.respuesta === 'aprueba';
+  return `<div class="alert ${ap ? 'ok' : 'warn'}" id="alerta-difrol"><b>Comuna fronteriza (${esc(com)}) · Respuesta DIFROL: ${ap ? 'APRUEBA' : 'RECHAZA'}</b>
+    ${d.fecha ? ` · ${fmtFecha(d.fecha)}` : ''}${d.oficio ? ` · Oficio N° ${esc(d.oficio)}` : ''}${d.obs ? ` · ${esc(d.obs)}` : ''}${ap ? '' : ' · <b>Por el rechazo de la DIFROL, el jefe provincial solo podrá emitir una resolución que rechaza el plan de manejo, aun cuando los informes técnico y jurídico lo aprueben.</b>'}
+    ${USUARIO.rol === 'ST' && !sol.resolucion ? ' <button class="btn sm ghost" id="ac-difrol" type="button">Modificar respuesta</button>' : ''}</div>`;
 }
 function rerender() { const y = window.scrollY; route(); window.scrollTo(0, y); }
 
@@ -94,7 +107,7 @@ function renderAcciones(sol) {
   if (puedeEditar(sol, 'tecnico')) btn('ac-tec', 'Enviar informe técnico al jefe analista');
   if (puedeEditar(sol, 'juridico')) btn('ac-jur', 'Enviar informe jurídico al jefe analista');
   if (r === 'JA' && e === 'revision') { btn('ac-dan', 'Devolver al analista', 'ghost'); btn('ac-dab', 'Devolver al abogado', 'ghost'); btn('ac-prop', 'Conforme: enviar al jefe provincial'); }
-  if (r === 'JP' && e === 'firma') { btn('ac-dja', 'Devolver al jefe analista', 'ghost'); btn('ac-firma', 'Firmar resolución'); }
+  if (r === 'JP' && e === 'firma') { btn('ac-dja', 'Devolver al jefe analista', 'ghost'); btn('ac-firma', 'Firmar resolución'); if (difrolPendiente(sol)) a.push('<span class="warn-txt small">No puede firmar: falta la respuesta de la DIFROL (comuna fronteriza), que debe registrar la secretaría técnica.</span>'); }
   if (r === 'ST' && e === 'resuelta') btn('ac-not', 'Registrar notificación');
   const quien = ESTADOS[e].rol;
   const info = a.length ? '' : `<span class="muted">${['notificada', 'desistida'].includes(e) ? 'Procedimiento terminado.' : `Sin acciones para su rol en esta etapa. ${quien ? `Responsable: ${responsable(sol)}.` : ''}`}</span>`;
@@ -175,7 +188,17 @@ function renderAcciones(sol) {
       botones: [{ txt: 'Cancelar' }, { txt: 'Devolver', valor: bg => $('#m-obs', bg).value.trim(), validar: bg => !!$('#m-obs', bg).value.trim() }] });
     if (obs) { devolverAJA(sol, obs); toast('Devuelto al jefe analista', 'ok'); rerender(); }
   });
+  on('ac-difrol', async () => {
+    const d0 = sol.difrol || {};
+    const v = await modal({ titulo: 'Respuesta de la DIFROL', html: `<p class="muted small">Comuna fronteriza (${esc(textoComunasFronterizas(sol))}): registre la respuesta de la Dirección de Fronteras y Límites de Chile a la solicitud ${esc(sol.id)}.</p>
+      <div class="fgrid"><label>Respuesta<select id="m-dr"><option value="">— Seleccione —</option><option value="aprueba" ${d0.respuesta === 'aprueba' ? 'selected' : ''}>Aprueba</option><option value="rechaza" ${d0.respuesta === 'rechaza' ? 'selected' : ''}>Rechaza</option></select></label>
+      <label>Fecha de la respuesta<input id="m-df" type="date" value="${esc(d0.fecha || hoyISO())}"></label><label class="span2">N° de oficio / documento<input id="m-do" value="${esc(d0.oficio || '')}"></label>
+      <label class="span2">Observaciones<textarea id="m-dobs" rows="3">${esc(d0.obs || '')}</textarea></label></div>`,
+      botones: [{ txt: 'Cancelar' }, { txt: 'Registrar respuesta', valor: bg => ({ respuesta: $('#m-dr', bg).value, fecha: $('#m-df', bg).value, oficio: $('#m-do', bg).value.trim(), obs: $('#m-dobs', bg).value.trim() }), validar: bg => !!$('#m-dr', bg).value && !!$('#m-df', bg).value }] });
+    if (v) { registrarRespuestaDifrol(sol, v); toast(`Respuesta de la DIFROL registrada: ${v.respuesta === 'aprueba' ? 'aprueba' : 'rechaza'}`, v.respuesta === 'aprueba' ? 'ok' : 'warn'); rerender(); }
+  });
   on('ac-firma', async () => {
+    if (difrolPendiente(sol)) { toast('Falta la respuesta de la DIFROL: la secretaría técnica debe registrarla antes de firmar', 'error'); return; }
     const ok = await modal({ titulo: 'Firmar resolución', ancho: 820, html: `<pre class="resol">${esc(textoResolucion(sol))}</pre><p class="muted small">Al firmar se asigna número, el plan aprobado se incorpora a la ficha predial y al registro público.</p>`,
       botones: [{ txt: 'Cancelar' }, { txt: 'Firmar resolución', valor: true }] });
     if (ok) { firmarResolucion(sol); toast(`Resolución N° ${sol.resolucion.numero} firmada`, 'ok'); location.hash = `#exp/${sol.id}/resolucion`; }
@@ -529,7 +552,7 @@ function tabJuridico(el, sol) {
 /* ---------- Revisión del jefe analista ---------- */
 function tabRevision(el, sol) {
   const ed = puedeEditar(sol, 'revision');
-  const pr = sol.revisionJA || propuestaDesde(sol);
+  const pr = ajustarPorDifrol(sol, sol.revisionJA) || propuestaDesde(sol);
   const chk = sol.revisionCheck = sol.revisionCheck || {};
   const ncT = PAUTA_TECNICA.filter(c => ((sol.tecnico.checks || {})[c.id] || {}).estado === 'no_cumple');
   const ncJ = PAUTA_JURIDICA.filter(c => ((sol.juridico.checks || {})[c.id] || {}).estado === 'no_cumple');
@@ -561,7 +584,7 @@ function tabResolucion(el, sol) {
   const r = sol.resolucion;
   el.innerHTML = `<div class="resol-wrap"><div>${r ? `<div class="alert ok">Resolución <b>N° ${esc(r.numero)}</b> firmada el ${fmtFecha(r.fecha)} por ${esc(usuario(r.firmadaPor).nombre)}.</div>` : '<div class="alert warn">Borrador pendiente de firma del jefe provincial.</div>'}
     <pre class="resol">${esc(textoResolucion(sol))}</pre></div>
-    <aside class="card"><h3>Antecedentes</h3><table class="kv"><tr><th>Tipo</th><td>${esc(RESUELVE[(r || sol.revisionJA).tipo])}</td></tr><tr><th>Sup. aprobada</th><td>${fmt((r || sol.revisionJA).supAprobada)} ha</td></tr>
+    <aside class="card"><h3>Antecedentes</h3><table class="kv"><tr><th>Tipo</th><td>${esc(RESUELVE[(r || ajustarPorDifrol(sol, sol.revisionJA)).tipo])}</td></tr><tr><th>Sup. aprobada</th><td>${fmt((r || ajustarPorDifrol(sol, sol.revisionJA)).supAprobada)} ha</td></tr>
       <tr><th>Vigencia</th><td>${fmtFecha((r || sol.revisionJA).vigenciaHasta)}</td></tr>
       ${r ? `<tr><th>Despacho carta certificada</th><td>Hasta ${fmtFecha(sumarHabiles(r.fecha, NORMA.plazoNotificarRechazo))}</td></tr>` : ''}
       ${sol.notificacion ? `<tr><th>Notificación</th><td>${esc(sol.notificacion.medio)} ${esc(sol.notificacion.numero || '')} · ${fmtFecha(sol.notificacion.fecha)}</td></tr>
